@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Electric River Raid</title>
+  </head>
+  <body>
+    <div id="app">
+      <noscript>This game needs JavaScript enabled and should be opened through the local dev server.</noscript>
+      <div id="file-warning">
+        Open this game at <strong>http://localhost:5176/</strong>. It will not run from a file URL.
+      </div>
+      <div id="game"></div>
+      <div id="hud" aria-live="polite">
+        <div class="hud-row">
+          <span id="score">000000</span>
+          <span id="section">LEVEL 1</span>
+          <span id="lives">3 CELLS</span>
+        </div>
+        <div class="charge-wrap" aria-label="charge">
+          <div id="charge"></div>
+        </div>
+      </div>
+      <button id="info-toggle" type="button" aria-controls="info-panel" aria-expanded="false">i</button>
+      <section id="info-panel" aria-labelledby="info-title" hidden>
+        <div class="info-header">
+          <h1 id="info-title">Icons & Points</h1>
+          <button id="info-close" type="button" aria-label="close info">×</button>
+        </div>
+        <div id="info-list"></div>
+      </section>
+      <div id="status" hidden></div>
+      <div id="touch-controls" aria-label="touch controls">
+        <button id="slow" type="button" aria-label="slow">-</button>
+        <button id="left" type="button" aria-label="bank left">‹</button>
+        <button id="fire" type="button" aria-label="fire">●</button>
+        <button id="right" type="button" aria-label="bank right">›</button>
+        <button id="fast" type="button" aria-label="accelerate">+</button>
+      </div>
+    </div>
+    <script>
+      if (window.location.protocol !== "file:") {
+        document.getElementById("file-warning")?.remove();
+      }
+    </script>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
