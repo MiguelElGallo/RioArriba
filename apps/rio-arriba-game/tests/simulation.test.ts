@@ -157,6 +157,21 @@ describe("Simulation", () => {
     expect(snap.score).toBe(ENTITY_RULES.gate.score);
   });
 
+  it("clears level-up messages after a short delay", () => {
+    const sim = new Simulation();
+    startPlaying(sim);
+    const bridge = entitiesForRange(2000, 2300).find((candidate) => candidate.kind === "gate");
+    expect(bridge).toBeDefined();
+    const shot: ShotState = { id: "shot-test", x: bridge!.x, y: bridge!.y, vx: 0, alive: true };
+
+    setPrivate(sim, "entities", new Map([[bridge!.id, bridge!]]));
+    setPrivate(sim, "shots", [shot]);
+
+    expect(sim.update(0).message).toBe("LEVEL 2");
+    expect(sim.update(900).message).toBe("LEVEL 2");
+    expect(sim.update(900).message).toBe("");
+  });
+
   it("restarts after the last destroyed bridge when a life remains", () => {
     const sim = new Simulation();
     startPlaying(sim);
@@ -289,6 +304,7 @@ describe("Simulation", () => {
     expect(snap.state).toBe("crashed");
     expect(snap.message).toBe("BRIDGE COLLISION");
     expect(snap.soundCues).toEqual(["crash"]);
+    expect(sim.update(2000).message).toBe("BRIDGE COLLISION");
   });
 
   it("crashes when charge is exhausted", () => {

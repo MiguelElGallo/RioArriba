@@ -11,6 +11,7 @@ const CHARGER_RECHARGE_PER_SECOND = 70;
 const RECHARGE_SOUND_INTERVAL_MS = 320;
 const TOUCH_STEER_GAIN = 7.5;
 const TOUCH_MAX_VX = 285;
+const LEVEL_MESSAGE_MS = 1800;
 
 export class Simulation {
   private player: PlayerState = {
@@ -32,6 +33,7 @@ export class Simulation {
   private level = 1;
   private state: GameSnapshot["state"] = "ready";
   private message = "DRAG LEFT SIDE - TAP RIGHT TO FIRE";
+  private messageTtlMs = 0;
   private fireCooldownMs = 0;
   private rechargeSoundCooldownMs = 0;
   private frameDt = 0;
@@ -43,6 +45,7 @@ export class Simulation {
     if (this.state === "ready" && Object.values(next).some(Boolean)) {
       this.state = "playing";
       this.message = "";
+      this.messageTtlMs = 0;
     }
     if ((this.state === "crashed" || this.state === "game-over") && next.fire) {
       this.reset(this.state === "game-over");
@@ -57,6 +60,7 @@ export class Simulation {
 
     this.fireCooldownMs = Math.max(0, this.fireCooldownMs - deltaMs);
     this.rechargeSoundCooldownMs = Math.max(0, this.rechargeSoundCooldownMs - deltaMs);
+    this.updateTransientMessage(deltaMs);
     this.player.invulnerableMs = Math.max(0, this.player.invulnerableMs - deltaMs);
     this.updatePlayer(dt);
     this.ensureEntities();
@@ -150,6 +154,7 @@ export class Simulation {
               this.checkpointY = (nextLevel - 1) * SECTION_LENGTH + 80;
               this.level = Math.max(this.level, nextLevel);
               this.message = `LEVEL ${this.level}`;
+              this.messageTtlMs = LEVEL_MESSAGE_MS;
             }
             this.soundCues.push("hit");
           }
@@ -187,6 +192,7 @@ export class Simulation {
     this.player.lives -= 1;
     this.state = this.player.lives <= 0 ? "game-over" : "crashed";
     this.message = this.state === "game-over" ? "GRID OFFLINE" : reason;
+    this.messageTtlMs = 0;
     this.soundCues.push("crash");
   }
 
@@ -212,6 +218,13 @@ export class Simulation {
     this.soundCues = [];
     this.state = "playing";
     this.message = "";
+    this.messageTtlMs = 0;
+  }
+
+  private updateTransientMessage(deltaMs: number): void {
+    if (this.messageTtlMs === 0) return;
+    this.messageTtlMs = Math.max(0, this.messageTtlMs - deltaMs);
+    if (this.messageTtlMs === 0) this.message = "";
   }
 
   private rechargeFromStation(): void {
