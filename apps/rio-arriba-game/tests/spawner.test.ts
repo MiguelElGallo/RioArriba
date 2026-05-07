@@ -20,12 +20,13 @@ describe("spawner charger pacing", () => {
     expect(chargerChanceForSection(0)).toBeGreaterThan(0.58);
     expect(chargerChanceForSection(2)).toBeLessThan(chargerChanceForSection(0));
     expect(chargerChanceForSection(8)).toBeLessThan(chargerChanceForSection(2));
-    expect(chargerChanceForSection(12)).toBe(MIN_CHARGER_CHANCE);
+    expect(chargerChanceForSection(18)).toBe(MIN_CHARGER_CHANCE);
   });
 
   it("spaces charger-eligible rows farther apart as sections progress", () => {
     expect(chargerRowStrideForSection(0)).toBe(MIN_CHARGER_ROW_GAP);
-    expect(chargerRowStrideForSection(2)).toBeGreaterThan(chargerRowStrideForSection(0));
+    expect(chargerRowStrideForSection(2)).toBe(chargerRowStrideForSection(0));
+    expect(chargerRowStrideForSection(3)).toBeGreaterThan(chargerRowStrideForSection(0));
     expect(chargerRowStrideForSection(4)).toBeGreaterThan(chargerRowStrideForSection(2));
     expect(chargerRowStrideForSection(8)).toBeGreaterThan(chargerRowStrideForSection(4));
   });

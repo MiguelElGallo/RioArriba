@@ -2,12 +2,12 @@ import { EntityState } from "./types";
 import { SECTION_LENGTH, riverBoundsAt } from "./river";
 
 export const SPAWN_ROW_SPACING = 230;
-export const FIRST_SECTION_CHARGER_CHANCE = 0.9;
-export const CHARGER_CHANCE_DECAY_PER_SECTION = 0.065;
-export const MIN_CHARGER_CHANCE = 0.16;
+export const FIRST_SECTION_CHARGER_CHANCE = 0.98;
+export const CHARGER_CHANCE_DECAY_PER_SECTION = 0.045;
+export const MIN_CHARGER_CHANCE = 0.24;
 export const CHARGER_ROW_STRIDE_START_SECTION = 0;
-export const CHARGER_ROW_STRIDE_SECTION_STEP = 2;
-export const MAX_CHARGER_ROW_STRIDE = 6;
+export const CHARGER_ROW_STRIDE_SECTION_STEP = 3;
+export const MAX_CHARGER_ROW_STRIDE = 5;
 export const MIN_CHARGER_ROW_GAP = 2;
 export const FIRST_SECTION_BARGE_WEIGHT = 0.34;
 export const MIN_BARGE_WEIGHT = 0.12;
