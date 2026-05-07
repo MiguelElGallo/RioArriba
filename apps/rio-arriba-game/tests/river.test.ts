@@ -23,6 +23,29 @@ describe("river generation", () => {
     expect(isInsideRiver(WORLD_WIDTH / 2, 80, 42)).toBe(true);
   });
 
+  it("funnels the river into a narrow bridge approach", () => {
+    const bridgeY = SECTION_LENGTH - 120;
+    const approach = riverBoundsAt(bridgeY - 40);
+    const beforeApproach = riverBoundsAt(bridgeY - 680);
+    const afterBridge = riverBoundsAt(bridgeY + 680);
+
+    expect(approach.width).toBeLessThanOrEqual(170);
+    expect(beforeApproach.width).toBeGreaterThan(approach.width + 120);
+    expect(afterBridge.width).toBeGreaterThan(approach.width + 80);
+    expect(isInsideRiver(WORLD_WIDTH / 2, bridgeY, 34)).toBe(true);
+  });
+
+  it("keeps bridge funnel transitions smooth enough to read", () => {
+    const bridgeY = SECTION_LENGTH - 120;
+    let previous = riverBoundsAt(bridgeY - 560).width;
+
+    for (let y = bridgeY - 460; y <= bridgeY + 460; y += 100) {
+      const width = riverBoundsAt(y).width;
+      expect(Math.abs(width - previous)).toBeLessThanOrEqual(72);
+      previous = width;
+    }
+  });
+
   it("detects bank collisions with player radius", () => {
     const bounds = riverBoundsAt(900);
     expect(isInsideRiver((bounds.left + bounds.right) / 2, 900, 18)).toBe(true);

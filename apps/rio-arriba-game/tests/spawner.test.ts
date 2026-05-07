@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SECTION_LENGTH } from "../src/systems/river";
+import { riverBoundsAt, SECTION_LENGTH } from "../src/systems/river";
 import {
   chargerChanceForSection,
   CHARGER_HEIGHT,
@@ -98,8 +98,11 @@ describe("spawner bridges", () => {
 
       expect(gates).toHaveLength(1);
       expect(gates[0].y).toBeGreaterThan(toY - SECTION_LENGTH * 0.16);
+      const room = riverBoundsAt(gates[0].y).width;
       expect(gates[0].h).toBeGreaterThanOrEqual(46);
-      expect(gates[0].w).toBeGreaterThanOrEqual(160);
+      expect(gates[0].w).toBeLessThanOrEqual(room - 24);
+      expect(gates[0].w).toBeGreaterThanOrEqual(110);
+      if (section === 0) expect(gates[0].w).toBeLessThan(230);
     }
   });
 });
