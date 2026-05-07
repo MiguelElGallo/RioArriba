@@ -26,7 +26,7 @@ export class Simulation {
   private score = 0;
   private level = 1;
   private state: GameSnapshot["state"] = "ready";
-  private message = "TAP FIRE";
+  private message = "DRAG TO STEER - TAP TO FIRE";
   private fireCooldownMs = 0;
   private checkpointY = 80;
   private soundCues: GameSnapshot["soundCues"] = [];

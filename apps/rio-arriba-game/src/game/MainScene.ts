@@ -1,6 +1,7 @@
 import Phaser from "phaser";
 import { riverBoundsAt, WORLD_WIDTH } from "../systems/river";
 import { Simulation } from "../systems/simulation";
+import { GestureInputController, mergeInputStates } from "../systems/touchGestureInput";
 import { EntityState, GameSnapshot, InputState, ShotState } from "../systems/types";
 
 const VIEW_W = 480;
@@ -9,12 +10,12 @@ const HUD_CLEARANCE = 54;
 export class MainScene extends Phaser.Scene {
   private simulation = new Simulation();
   private audio = new AudioDirector();
+  private gestureInput = new GestureInputController({ dragThresholdPx: 18, firePulseMs: 170 });
   private graphics!: Phaser.GameObjects.Graphics;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private fireKey!: Phaser.Input.Keyboard.Key;
-  private mobileInput: InputState = { left: false, right: false, up: false, down: false, fire: false };
+  private buttonInput: InputState = { left: false, right: false, up: false, down: false, fire: false };
   private previousInput: InputState = { left: false, right: false, up: false, down: false, fire: false };
-  private firePulseUntil = 0;
 
   constructor() {
     super("main");
@@ -25,9 +26,14 @@ export class MainScene extends Phaser.Scene {
     this.graphics = this.add.graphics();
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.fireKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-    this.bindTouchControls();
+    this.bindButtonControls();
+    this.bindGestureControls();
     this.input.keyboard?.on("keydown", () => this.audio.unlock());
     this.input.on("pointerdown", () => this.audio.unlock());
+    window.addEventListener("blur", () => {
+      this.gestureInput.cancelAll(this.time.now);
+      this.buttonInput = { left: false, right: false, up: false, down: false, fire: false };
+    });
   }
 
   update(_time: number, delta: number): void {
@@ -43,16 +49,17 @@ export class MainScene extends Phaser.Scene {
   }
 
   private readInput(): InputState {
-    return {
-      left: this.cursors.left.isDown || this.mobileInput.left,
-      right: this.cursors.right.isDown || this.mobileInput.right,
-      up: this.cursors.up.isDown || this.mobileInput.up,
-      down: this.cursors.down.isDown || this.mobileInput.down,
-      fire: this.fireKey.isDown || this.mobileInput.fire || performance.now() < this.firePulseUntil
+    const keyboardInput: InputState = {
+      left: this.cursors.left.isDown,
+      right: this.cursors.right.isDown,
+      up: this.cursors.up.isDown,
+      down: this.cursors.down.isDown,
+      fire: this.fireKey.isDown
     };
+    return mergeInputStates(keyboardInput, this.buttonInput, this.gestureInput.stateAt(this.time.now));
   }
 
-  private bindTouchControls(): void {
+  private bindButtonControls(): void {
     const bindings: Array<[keyof InputState, string]> = [
       ["left", "left"],
       ["right", "right"],
@@ -65,13 +72,12 @@ export class MainScene extends Phaser.Scene {
       const element = document.getElementById(id);
       if (!element) continue;
       const set = (value: boolean) => {
-        this.mobileInput[key] = value;
-        this.simulation.setInput({ [key]: value });
+        this.buttonInput = { ...this.buttonInput, [key]: value };
       };
       element.addEventListener("pointerdown", (event) => {
         event.preventDefault();
+        event.stopPropagation();
         this.audio.unlock();
-        if (key === "fire") this.firePulseUntil = performance.now() + 150;
         set(true);
         (event.currentTarget as HTMLElement).setPointerCapture(event.pointerId);
       });
@@ -79,6 +85,34 @@ export class MainScene extends Phaser.Scene {
       element.addEventListener("pointercancel", () => set(false));
       element.addEventListener("pointerleave", () => set(false));
     }
+  }
+
+  private bindGestureControls(): void {
+    const interactiveTarget = this.input;
+    const point = (pointer: Phaser.Input.Pointer) => ({
+      pointerId: pointer.id,
+      x: pointer.x,
+      y: pointer.y,
+      timeMs: this.time.now
+    });
+
+    interactiveTarget.on("pointerdown", (pointer: Phaser.Input.Pointer, currentlyOver: unknown[] = []) => {
+      if (currentlyOver.length > 0) return;
+      this.audio.unlock();
+      this.gestureInput.pointerDown(point(pointer));
+    });
+    interactiveTarget.on("pointermove", (pointer: Phaser.Input.Pointer) => {
+      this.gestureInput.pointerMove(point(pointer));
+    });
+    interactiveTarget.on("pointerup", (pointer: Phaser.Input.Pointer) => {
+      this.gestureInput.pointerUp(point(pointer));
+    });
+    interactiveTarget.on("pointerupoutside", (pointer: Phaser.Input.Pointer) => {
+      this.gestureInput.pointerUp(point(pointer));
+    });
+    interactiveTarget.on("pointercancel", (pointer: Phaser.Input.Pointer) => {
+      this.gestureInput.pointerCancel(point(pointer));
+    });
   }
 
   private draw(snap: ReturnType<Simulation["snapshot"]>): void {
