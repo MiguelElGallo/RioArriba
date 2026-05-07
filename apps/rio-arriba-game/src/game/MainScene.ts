@@ -10,8 +10,9 @@ const HUD_CLEARANCE = 54;
 export class MainScene extends Phaser.Scene {
   private simulation = new Simulation();
   private audio = new AudioDirector();
-  private gestureInput = new GestureInputController({ dragThresholdPx: 18, firePulseMs: 170 });
+  private gestureInput = new GestureInputController({ joystickDeadZonePx: 8, joystickRadiusPx: 44, firePulseMs: 170 });
   private graphics!: Phaser.GameObjects.Graphics;
+  private controlsGraphics!: Phaser.GameObjects.Graphics;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private fireKey!: Phaser.Input.Keyboard.Key;
   private buttonInput: InputState = { left: false, right: false, up: false, down: false, fire: false };
@@ -24,6 +25,8 @@ export class MainScene extends Phaser.Scene {
   create(): void {
     this.cameras.main.setBackgroundColor("#071718");
     this.graphics = this.add.graphics();
+    this.controlsGraphics = this.add.graphics();
+    this.input.addPointer(2);
     this.cursors = this.input.keyboard!.createCursorKeys();
     this.fireKey = this.input.keyboard!.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
     this.bindButtonControls();
@@ -42,6 +45,7 @@ export class MainScene extends Phaser.Scene {
     this.simulation.setInput(input);
     const snap = this.simulation.update(delta);
     this.draw(snap);
+    this.drawJoystick();
     this.updateHud(snap);
     this.audio.updateEngine(snap.state === "playing", snap.player.speed);
     for (const cue of snap.soundCues) this.audio.playCue(cue);
@@ -133,6 +137,25 @@ export class MainScene extends Phaser.Scene {
       snap.player.x,
       snap.state === "playing" && snap.player.invulnerableMs > 0 && Math.floor(snap.player.invulnerableMs / 120) % 2 === 0
     );
+  }
+
+  private drawJoystick(): void {
+    const joystick = this.gestureInput.joystickVisualState();
+    const g = this.controlsGraphics;
+    g.clear();
+    if (!joystick.active) return;
+
+    g.lineStyle(2, 0x8cfffb, 0.68);
+    g.fillStyle(0x071718, 0.26);
+    g.fillCircle(joystick.originX, joystick.originY, joystick.radius);
+    g.strokeCircle(joystick.originX, joystick.originY, joystick.radius);
+    g.lineStyle(2, 0x95ff4f, 0.4);
+    g.lineBetween(joystick.originX - 16, joystick.originY, joystick.originX + 16, joystick.originY);
+    g.lineBetween(joystick.originX, joystick.originY - 16, joystick.originX, joystick.originY + 16);
+    g.fillStyle(0x95ff4f, 0.84);
+    g.fillCircle(joystick.knobX, joystick.knobY, 15);
+    g.lineStyle(2, 0xffffff, 0.78);
+    g.strokeCircle(joystick.knobX, joystick.knobY, 15);
   }
 
   private drawTerrain(g: Phaser.GameObjects.Graphics, playerY: number): void {

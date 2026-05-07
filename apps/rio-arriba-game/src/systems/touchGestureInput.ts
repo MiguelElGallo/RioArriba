@@ -16,9 +16,20 @@ export interface GesturePointer {
 }
 
 export interface GestureInputOptions {
+  joystickDeadZonePx?: number;
+  joystickRadiusPx?: number;
   dragThresholdPx?: number;
   firePulseMs?: number;
   tapMaxMs?: number;
+}
+
+export interface JoystickVisualState {
+  active: boolean;
+  originX: number;
+  originY: number;
+  knobX: number;
+  knobY: number;
+  radius: number;
 }
 
 interface DragPointer {
@@ -30,7 +41,8 @@ interface DragPointer {
   y: number;
 }
 
-const DEFAULT_DRAG_THRESHOLD_PX = 24;
+const DEFAULT_JOYSTICK_DEAD_ZONE_PX = 10;
+const DEFAULT_JOYSTICK_RADIUS_PX = 42;
 const DEFAULT_FIRE_PULSE_MS = 150;
 const DEFAULT_TAP_MAX_MS = 220;
 
@@ -48,14 +60,17 @@ export function mergeInputStates(...states: Array<Partial<InputState> | undefine
 }
 
 export class GestureInputController {
-  private readonly dragThresholdPx: number;
+  private readonly joystickDeadZonePx: number;
+  private readonly joystickRadiusPx: number;
   private readonly firePulseMs: number;
   private readonly tapMaxMs: number;
   private dragPointer: DragPointer | null = null;
   private firePulseUntilMs = 0;
 
   constructor(options: GestureInputOptions = {}) {
-    this.dragThresholdPx = options.dragThresholdPx ?? DEFAULT_DRAG_THRESHOLD_PX;
+    this.joystickDeadZonePx =
+      options.joystickDeadZonePx ?? options.dragThresholdPx ?? DEFAULT_JOYSTICK_DEAD_ZONE_PX;
+    this.joystickRadiusPx = options.joystickRadiusPx ?? DEFAULT_JOYSTICK_RADIUS_PX;
     this.firePulseMs = options.firePulseMs ?? DEFAULT_FIRE_PULSE_MS;
     this.tapMaxMs = options.tapMaxMs ?? DEFAULT_TAP_MAX_MS;
   }
@@ -125,6 +140,29 @@ export class GestureInputController {
     };
   }
 
+  joystickVisualState(): JoystickVisualState {
+    if (!this.dragPointer) {
+      return {
+        active: false,
+        originX: 0,
+        originY: 0,
+        knobX: 0,
+        knobY: 0,
+        radius: this.joystickRadiusPx
+      };
+    }
+
+    const { x, y } = this.clampedKnobOffset();
+    return {
+      active: true,
+      originX: this.dragPointer.startX,
+      originY: this.dragPointer.startY,
+      knobX: this.dragPointer.startX + x,
+      knobY: this.dragPointer.startY + y,
+      radius: this.joystickRadiusPx
+    };
+  }
+
   private dragInput(): InputState {
     if (!this.dragPointer) return { ...EMPTY_INPUT_STATE };
 
@@ -132,10 +170,10 @@ export class GestureInputController {
     const dy = this.dragPointer.y - this.dragPointer.startY;
 
     return {
-      left: dx <= -this.dragThresholdPx,
-      right: dx >= this.dragThresholdPx,
-      up: dy <= -this.dragThresholdPx,
-      down: dy >= this.dragThresholdPx,
+      left: dx <= -this.joystickDeadZonePx,
+      right: dx >= this.joystickDeadZonePx,
+      up: dy <= -this.joystickDeadZonePx,
+      down: dy >= this.joystickDeadZonePx,
       fire: false
     };
   }
@@ -145,6 +183,16 @@ export class GestureInputController {
     const dx = pointer.x - this.dragPointer.startX;
     const dy = pointer.y - this.dragPointer.startY;
     const distance = Math.hypot(dx, dy);
-    return distance < this.dragThresholdPx && pointer.timeMs - this.dragPointer.startTimeMs <= this.tapMaxMs;
+    return distance < this.joystickDeadZonePx && pointer.timeMs - this.dragPointer.startTimeMs <= this.tapMaxMs;
+  }
+
+  private clampedKnobOffset(): { x: number; y: number } {
+    if (!this.dragPointer) return { x: 0, y: 0 };
+    const dx = this.dragPointer.x - this.dragPointer.startX;
+    const dy = this.dragPointer.y - this.dragPointer.startY;
+    const distance = Math.hypot(dx, dy);
+    if (distance <= this.joystickRadiusPx) return { x: dx, y: dy };
+    const scale = this.joystickRadiusPx / distance;
+    return { x: dx * scale, y: dy * scale };
   }
 }
