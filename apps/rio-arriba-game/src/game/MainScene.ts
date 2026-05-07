@@ -7,12 +7,28 @@ import { EntityState, GameSnapshot, InputState, ShotState } from "../systems/typ
 const VIEW_W = 480;
 const HUD_CLEARANCE = 54;
 
+const SPRITE_ASSETS: Record<string, string> = {
+  player: new URL("../assets/designer-handoff/icons/player-electric-plane.png", import.meta.url).href,
+  barge: new URL("../assets/designer-handoff/icons/enemy-barge.png", import.meta.url).href,
+  drone: new URL("../assets/designer-handoff/icons/enemy-drone.png", import.meta.url).href,
+  jet: new URL("../assets/designer-handoff/icons/enemy-jet.png", import.meta.url).href,
+  charger: new URL("../assets/designer-handoff/icons/charging-station.png", import.meta.url).href,
+  gate: new URL("../assets/designer-handoff/icons/bridge-gate.png", import.meta.url).href,
+  shot: new URL("../assets/designer-handoff/icons/player-shot.png", import.meta.url).href,
+  hitBurst: new URL("../assets/designer-handoff/icons/hit-burst.png", import.meta.url).href,
+  crashBurst: new URL("../assets/designer-handoff/icons/crash-burst.png", import.meta.url).href,
+  rechargePulse: new URL("../assets/designer-handoff/icons/recharge-pulse.png", import.meta.url).href
+};
+
 export class MainScene extends Phaser.Scene {
   private simulation = new Simulation();
   private audio = new AudioDirector();
   private gestureInput = new GestureInputController({ dragDeadZonePx: 8, speedThresholdPx: 46, steerScale: 1.18, firePulseMs: 170 });
   private graphics!: Phaser.GameObjects.Graphics;
   private controlsGraphics!: Phaser.GameObjects.Graphics;
+  private playerSprite!: Phaser.GameObjects.Image;
+  private entitySprites = new Map<string, Phaser.GameObjects.Image>();
+  private shotSprites = new Map<string, Phaser.GameObjects.Image>();
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private fireKey!: Phaser.Input.Keyboard.Key;
   private buttonInput: InputState = { left: false, right: false, up: false, down: false, fire: false };
@@ -22,9 +38,14 @@ export class MainScene extends Phaser.Scene {
     super("main");
   }
 
+  preload(): void {
+    for (const [key, url] of Object.entries(SPRITE_ASSETS)) this.load.image(key, url);
+  }
+
   create(): void {
     this.cameras.main.setBackgroundColor("#071718");
     this.graphics = this.add.graphics();
+    this.playerSprite = this.add.image(0, 0, "player").setVisible(false);
     this.controlsGraphics = this.add.graphics();
     this.input.addPointer(2);
     this.cursors = this.input.keyboard!.createCursorKeys();
@@ -48,7 +69,10 @@ export class MainScene extends Phaser.Scene {
     this.drawTouchControl();
     this.updateHud(snap);
     this.audio.updateEngine(snap.state === "playing", snap.player.speed);
-    for (const cue of snap.soundCues) this.audio.playCue(cue);
+    for (const cue of snap.soundCues) {
+      this.audio.playCue(cue);
+      this.playCueEffect(cue, snap);
+    }
     this.previousInput = input;
   }
 
@@ -136,13 +160,14 @@ export class MainScene extends Phaser.Scene {
     g.clear();
     g.setPosition(this.originX(), 0);
     this.drawTerrain(g, snap.player.y);
-    for (const entity of snap.entities) this.drawEntity(g, entity, snap.player.y);
-    for (const shot of snap.shots) this.drawShot(g, shot, snap.player.y);
-    this.drawPlayer(
-      g,
+    for (const entity of snap.entities) this.drawEntityReticle(g, entity, snap.player.y);
+    this.syncEntitySprites(snap.entities, snap.player.y);
+    this.syncShotSprites(snap.shots, snap.player.y);
+    this.syncPlayerSprite(
       snap.player.x,
       snap.state === "playing" && snap.player.invulnerableMs > 0 && Math.floor(snap.player.invulnerableMs / 120) % 2 === 0
     );
+    this.children.bringToTop(this.controlsGraphics);
   }
 
   private drawTouchControl(): void {
@@ -216,91 +241,87 @@ export class MainScene extends Phaser.Scene {
     }
   }
 
-  private drawPlayer(g: Phaser.GameObjects.Graphics, x: number, hidden: boolean): void {
-    if (hidden) return;
+  private syncPlayerSprite(x: number, dimmed: boolean): void {
     const y = this.playerScreenY();
-    g.lineStyle(8, 0x48f7ff, 0.18);
-    g.strokeTriangle(x, y - 40, x - 44, y + 19, x + 44, y + 19);
-    g.fillStyle(0xeaffff, 1);
-    g.fillTriangle(x, y - 42, x - 13, y + 25, x + 13, y + 25);
-    g.fillStyle(0x20e9ff, 1);
-    g.fillTriangle(x, y - 28, x - 40, y + 15, x + 40, y + 15);
-    g.fillStyle(0x102d35, 1);
-    g.fillTriangle(x, y - 25, x - 7, y + 2, x + 7, y + 2);
-    g.fillStyle(0xffffff, 1);
-    g.fillRect(x - 12, y + 19, 24, 9);
-    g.fillStyle(0x89f7ff, 0.55);
-    g.fillTriangle(x - 11, y + 29, x - 4, y + 46, x + 1, y + 29);
-    g.fillTriangle(x + 11, y + 29, x + 4, y + 46, x - 1, y + 29);
-    g.lineStyle(2, 0xffffff, 0.95);
-    g.strokeTriangle(x, y - 42, x - 40, y + 15, x + 40, y + 15);
+    this.playerSprite
+      .setPosition(this.originX() + x, y)
+      .setDisplaySize(88, 88)
+      .setDepth(5)
+      .setAlpha(dimmed ? 0.38 : 1)
+      .setVisible(true);
   }
 
-  private drawEntity(g: Phaser.GameObjects.Graphics, entity: EntityState, playerY: number): void {
+  private drawEntityReticle(g: Phaser.GameObjects.Graphics, entity: EntityState, playerY: number): void {
     const y = this.toScreenY(entity.y, playerY);
     if (y < HUD_CLEARANCE || y > this.viewH() + 80) return;
     if (entity.kind === "charger") {
       this.drawTargetReticle(g, entity.x, y, 0x95ff4f, 0.45);
-      const h = entity.h;
-      g.fillStyle(0x0d2d28, 1);
-      g.fillRoundedRect(entity.x - entity.w / 2, y - h / 2, entity.w, h, 8);
-      g.fillStyle(0x143f38, 1);
-      g.fillRoundedRect(entity.x - 18, y - h / 2 + 10, 36, h - 20, 6);
-      g.fillStyle(0x95ff4f, 1);
-      g.fillRect(entity.x + 10, y - h / 2 - 9, 14, 9);
-      g.lineStyle(3, 0xb6ff70, 1);
-      g.strokeRoundedRect(entity.x - entity.w / 2, y - h / 2, entity.w, h, 8);
-      g.lineStyle(4, 0xd8ff70, 1);
-      g.beginPath();
-      g.moveTo(entity.x + 3, y - 28);
-      g.lineTo(entity.x - 10, y);
-      g.lineTo(entity.x + 5, y);
-      g.lineTo(entity.x - 6, y + 30);
-      g.strokePath();
-      g.lineStyle(2, 0x7fffe1, 1);
-      for (let railY = y - h / 2 + 22; railY < y + h / 2 - 10; railY += 24) {
-        g.lineBetween(entity.x - entity.w / 2 + 9, railY, entity.x - 24, railY + 8);
-        g.lineBetween(entity.x + entity.w / 2 - 9, railY, entity.x + 24, railY + 8);
-      }
       return;
     }
     if (entity.kind === "gate") {
       this.drawTargetReticle(g, entity.x, y, 0xffe37a, 0.78);
       g.lineStyle(10, 0xffe37a, 0.16);
       g.lineBetween(entity.x - entity.w / 2 - 12, y, entity.x + entity.w / 2 + 12, y);
-      g.fillStyle(0x3b271b, 1);
-      g.fillRoundedRect(entity.x - entity.w / 2, y - entity.h / 2, entity.w, entity.h, 4);
-      g.fillStyle(0xffd166, 1);
-      for (let x = entity.x - entity.w / 2 + 10; x < entity.x + entity.w / 2; x += 28) {
-        g.fillRect(x, y - entity.h / 2, 12, entity.h);
-      }
-      g.fillStyle(0x1d1410, 0.82);
-      for (let x = entity.x - entity.w / 2 + 22; x < entity.x + entity.w / 2; x += 56) {
-        g.fillTriangle(x, y - entity.h / 2, x + 28, y, x, y + entity.h / 2);
-      }
-      g.lineStyle(4, 0xfff3b0, 1);
-      g.strokeRoundedRect(entity.x - entity.w / 2, y - entity.h / 2, entity.w, entity.h, 4);
       g.lineStyle(3, 0xff5548, 0.9);
       g.lineBetween(entity.x - entity.w / 2, y - entity.h / 2 - 9, entity.x + entity.w / 2, y - entity.h / 2 - 9);
       g.lineBetween(entity.x - entity.w / 2, y + entity.h / 2 + 9, entity.x + entity.w / 2, y + entity.h / 2 + 9);
       return;
     }
     this.drawTargetReticle(g, entity.x, y, 0x8cfffb, 0.42);
-    if (entity.kind === "barge") this.drawBarge(g, entity, y);
-    if (entity.kind === "drone") this.drawDrone(g, entity, y);
-    if (entity.kind === "jet") this.drawEnemyJet(g, entity, y);
   }
 
-  private drawShot(g: Phaser.GameObjects.Graphics, shot: ShotState, playerY: number): void {
-    const y = this.toScreenY(shot.y, playerY);
-    g.lineStyle(16, 0x8cfffb, 0.18);
-    g.lineBetween(shot.x, y - 22, shot.x, y + 12);
-    g.lineStyle(8, 0x8cfffb, 0.35);
-    g.lineBetween(shot.x, y - 20, shot.x, y + 10);
-    g.lineStyle(4, 0x8cfffb, 1);
-    g.lineBetween(shot.x, y - 18, shot.x, y + 8);
-    g.lineStyle(1, 0xffffff, 1);
-    g.lineBetween(shot.x, y - 16, shot.x, y + 8);
+  private syncEntitySprites(entities: EntityState[], playerY: number): void {
+    const active = new Set<string>();
+    for (const entity of entities) {
+      active.add(entity.id);
+      const sprite = this.entitySprites.get(entity.id) ?? this.add.image(0, 0, entity.kind);
+      this.entitySprites.set(entity.id, sprite);
+      const y = this.toScreenY(entity.y, playerY);
+      const visible = y >= HUD_CLEARANCE && y <= this.viewH() + 80;
+      const size = this.entityDisplaySize(entity);
+      sprite
+        .setTexture(entity.kind)
+        .setPosition(this.originX() + entity.x, y)
+        .setDisplaySize(size.w, size.h)
+        .setDepth(entity.kind === "gate" ? 4 : 3)
+        .setVisible(visible);
+    }
+    for (const [id, sprite] of this.entitySprites) {
+      if (!active.has(id)) {
+        if (sprite.visible) this.spawnEffect("hitBurst", sprite.x, sprite.y, 96, 220);
+        sprite.destroy();
+        this.entitySprites.delete(id);
+      }
+    }
+  }
+
+  private syncShotSprites(shots: ShotState[], playerY: number): void {
+    const active = new Set<string>();
+    for (const shot of shots) {
+      active.add(shot.id);
+      const sprite = this.shotSprites.get(shot.id) ?? this.add.image(0, 0, "shot");
+      this.shotSprites.set(shot.id, sprite);
+      const y = this.toScreenY(shot.y, playerY);
+      sprite
+        .setPosition(this.originX() + shot.x, y)
+        .setDisplaySize(24, 48)
+        .setDepth(6)
+        .setVisible(y >= HUD_CLEARANCE && y <= this.viewH() + 80);
+    }
+    for (const [id, sprite] of this.shotSprites) {
+      if (!active.has(id)) {
+        sprite.destroy();
+        this.shotSprites.delete(id);
+      }
+    }
+  }
+
+  private entityDisplaySize(entity: EntityState): { w: number; h: number } {
+    if (entity.kind === "charger") return { w: 66, h: 164 };
+    if (entity.kind === "gate") return { w: Math.max(180, entity.w), h: 78 };
+    if (entity.kind === "barge") return { w: 68, h: 68 };
+    if (entity.kind === "drone") return { w: 78, h: 78 };
+    return { w: 70, h: 70 };
   }
 
   private drawTargetReticle(g: Phaser.GameObjects.Graphics, x: number, y: number, color: number, alpha: number): void {
@@ -312,36 +333,26 @@ export class MainScene extends Phaser.Scene {
     g.lineBetween(x, y + 22, x, y + 34);
   }
 
-  private drawBarge(g: Phaser.GameObjects.Graphics, entity: EntityState, y: number): void {
-    g.fillStyle(0xd95f3f, 1);
-    g.fillTriangle(entity.x - 32, y - 12, entity.x + 32, y - 12, entity.x + 22, y + 18);
-    g.fillTriangle(entity.x - 32, y - 12, entity.x - 22, y + 18, entity.x + 22, y + 18);
-    g.fillStyle(0xffd166, 1);
-    g.fillRoundedRect(entity.x - 15, y - 25, 30, 17, 4);
-    g.lineStyle(2, 0x240f0c, 1);
-    g.strokeTriangle(entity.x - 32, y - 12, entity.x + 32, y - 12, entity.x + 22, y + 18);
+  private playCueEffect(cue: GameSnapshot["soundCues"][number], snap: GameSnapshot): void {
+    if (cue === "crash") {
+      this.spawnEffect("crashBurst", this.originX() + snap.player.x, this.playerScreenY(), 132, 440);
+    }
+    if (cue === "recharge") {
+      this.spawnEffect("rechargePulse", this.originX() + snap.player.x, this.playerScreenY(), 112, 360);
+    }
   }
 
-  private drawDrone(g: Phaser.GameObjects.Graphics, entity: EntityState, y: number): void {
-    g.fillStyle(0xffc857, 1);
-    g.fillRoundedRect(entity.x - 20, y - 13, 40, 26, 8);
-    g.fillStyle(0x17120a, 1);
-    g.fillCircle(entity.x - 27, y - 18, 8);
-    g.fillCircle(entity.x + 27, y - 18, 8);
-    g.lineStyle(3, 0xfff3b0, 1);
-    g.lineBetween(entity.x - 40, y - 18, entity.x - 14, y - 18);
-    g.lineBetween(entity.x + 14, y - 18, entity.x + 40, y - 18);
-    g.lineStyle(2, 0x201508, 1);
-    g.strokeRoundedRect(entity.x - 20, y - 13, 40, 26, 8);
-  }
-
-  private drawEnemyJet(g: Phaser.GameObjects.Graphics, entity: EntityState, y: number): void {
-    g.fillStyle(0xa94dff, 1);
-    g.fillTriangle(entity.x, y - 24, entity.x - 13, y + 20, entity.x + 13, y + 20);
-    g.fillStyle(0xf2d6ff, 1);
-    g.fillTriangle(entity.x, y - 4, entity.x - 30, y + 10, entity.x + 30, y + 10);
-    g.lineStyle(2, 0x26083d, 1);
-    g.strokeTriangle(entity.x, y - 24, entity.x - 30, y + 10, entity.x + 30, y + 10);
+  private spawnEffect(texture: "hitBurst" | "crashBurst" | "rechargePulse", x: number, y: number, size: number, durationMs: number): void {
+    const effect = this.add.image(x, y, texture).setDisplaySize(size, size).setDepth(7).setAlpha(0.92);
+    this.tweens.add({
+      targets: effect,
+      alpha: 0,
+      scaleX: effect.scaleX * 1.35,
+      scaleY: effect.scaleY * 1.35,
+      duration: durationMs,
+      ease: "Quad.easeOut",
+      onComplete: () => effect.destroy()
+    });
   }
 
   private toScreenY(worldY: number, playerY: number): number {

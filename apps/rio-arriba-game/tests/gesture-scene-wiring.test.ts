@@ -17,4 +17,27 @@ describe("gesture scene wiring", () => {
     expect(sceneSource).toContain('interactiveTarget.on("pointercancel"');
     expect(sceneSource).toContain('document.getElementById("hud")');
   });
+
+  it("preloads designer sprites and gameplay effects through stable scene keys", () => {
+    for (const asset of [
+      "player-electric-plane.png",
+      "enemy-barge.png",
+      "enemy-drone.png",
+      "enemy-jet.png",
+      "charging-station.png",
+      "bridge-gate.png",
+      "player-shot.png",
+      "hit-burst.png",
+      "crash-burst.png",
+      "recharge-pulse.png"
+    ]) {
+      expect(sceneSource).toContain(asset);
+    }
+
+    expect(sceneSource).toContain("preload(): void");
+    expect(sceneSource).toContain("this.load.image");
+    expect(sceneSource).toContain("syncEntitySprites");
+    expect(sceneSource).toContain("syncShotSprites");
+    expect(sceneSource).toContain("playCueEffect");
+  });
 });

@@ -4,6 +4,7 @@ import { ENTITY_RULES } from "../src/systems/types";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const mainSource = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
+const stylesheet = readFileSync(new URL("../src/styles/global.css", import.meta.url), "utf8");
 const viteConfig = readFileSync(new URL("../vite.config.ts", import.meta.url), "utf8");
 
 describe("info page", () => {
@@ -24,6 +25,22 @@ describe("info page", () => {
     expect(mainSource).toContain('document.getElementById("info-panel")');
     expect(mainSource).toContain('document.getElementById("info-list")');
     expect(mainSource).toContain('addEventListener("click"');
+  });
+
+  it("uses designer icons in the info panel and mobile control affordances", () => {
+    for (const asset of [
+      "icon-charger.png",
+      "icon-barge.png",
+      "icon-drone.png",
+      "icon-jet.png",
+      "icon-bridge-gate.png",
+      "icon-life-cell.png",
+      "icon-fire.png",
+      "icon-slow.png",
+      "icon-fast.png"
+    ]) {
+      expect(stylesheet).toContain(asset);
+    }
   });
 
   it("includes a final game-over score screen", () => {
