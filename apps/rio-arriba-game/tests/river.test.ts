@@ -19,7 +19,7 @@ describe("river generation", () => {
 
   it("gives the starting lane enough room for early steering mistakes", () => {
     const start = riverBoundsAt(80);
-    expect(start.width).toBeGreaterThanOrEqual(260);
+    expect(start.width).toBeGreaterThanOrEqual(350);
     expect(isInsideRiver(WORLD_WIDTH / 2, 80, 42)).toBe(true);
   });
 

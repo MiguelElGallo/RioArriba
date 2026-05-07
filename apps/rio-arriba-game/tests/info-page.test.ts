@@ -26,6 +26,12 @@ describe("info page", () => {
     expect(mainSource).toContain('addEventListener("click"');
   });
 
+  it("includes a final game-over score screen", () => {
+    expect(html).toContain('id="game-over-panel"');
+    expect(html).toContain('id="final-score"');
+    expect(html).toContain("Tap to restart");
+  });
+
   it("keeps local and GitHub Pages publish assumptions explicit", () => {
     expect(html).toContain("http://localhost:5173/");
     expect(html).not.toContain("http://localhost:5176/");

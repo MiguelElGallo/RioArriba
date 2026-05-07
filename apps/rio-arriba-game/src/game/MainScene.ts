@@ -111,6 +111,10 @@ export class MainScene extends Phaser.Scene {
     interactiveTarget.on("pointerdown", (pointer: Phaser.Input.Pointer, currentlyOver: unknown[] = []) => {
       if (currentlyOver.length > 0) return;
       this.audio.unlock();
+      if (this.simulation.snapshot().state === "game-over") {
+        this.gestureInput.pointerDown({ ...point(pointer), isFireZone: true });
+        return;
+      }
       this.gestureInput.pointerDown(point(pointer));
     });
     interactiveTarget.on("pointermove", (pointer: Phaser.Input.Pointer) => {
@@ -261,15 +265,24 @@ export class MainScene extends Phaser.Scene {
       return;
     }
     if (entity.kind === "gate") {
-      this.drawTargetReticle(g, entity.x, y, 0xffe37a, 0.55);
-      g.fillStyle(0x5b4b39, 1);
-      g.fillRect(entity.x - entity.w / 2, y - 16, entity.w, 32);
-      g.fillStyle(0x2d241b, 1);
-      for (let x = entity.x - entity.w / 2 + 16; x < entity.x + entity.w / 2; x += 34) {
-        g.fillRect(x, y - 18, 12, 36);
+      this.drawTargetReticle(g, entity.x, y, 0xffe37a, 0.78);
+      g.lineStyle(10, 0xffe37a, 0.16);
+      g.lineBetween(entity.x - entity.w / 2 - 12, y, entity.x + entity.w / 2 + 12, y);
+      g.fillStyle(0x3b271b, 1);
+      g.fillRoundedRect(entity.x - entity.w / 2, y - entity.h / 2, entity.w, entity.h, 4);
+      g.fillStyle(0xffd166, 1);
+      for (let x = entity.x - entity.w / 2 + 10; x < entity.x + entity.w / 2; x += 28) {
+        g.fillRect(x, y - entity.h / 2, 12, entity.h);
       }
-      g.lineStyle(3, 0xffe37a, 1);
-      g.strokeRect(entity.x - entity.w / 2, y - 16, entity.w, 32);
+      g.fillStyle(0x1d1410, 0.82);
+      for (let x = entity.x - entity.w / 2 + 22; x < entity.x + entity.w / 2; x += 56) {
+        g.fillTriangle(x, y - entity.h / 2, x + 28, y, x, y + entity.h / 2);
+      }
+      g.lineStyle(4, 0xfff3b0, 1);
+      g.strokeRoundedRect(entity.x - entity.w / 2, y - entity.h / 2, entity.w, entity.h, 4);
+      g.lineStyle(3, 0xff5548, 0.9);
+      g.lineBetween(entity.x - entity.w / 2, y - entity.h / 2 - 9, entity.x + entity.w / 2, y - entity.h / 2 - 9);
+      g.lineBetween(entity.x - entity.w / 2, y + entity.h / 2 + 9, entity.x + entity.w / 2, y + entity.h / 2 + 9);
       return;
     }
     this.drawTargetReticle(g, entity.x, y, 0x8cfffb, 0.42);
@@ -355,6 +368,8 @@ export class MainScene extends Phaser.Scene {
     const lives = document.getElementById("lives");
     const charge = document.getElementById("charge");
     const status = document.getElementById("status");
+    const gameOver = document.getElementById("game-over-panel");
+    const finalScore = document.getElementById("final-score");
     if (score) score.textContent = snap.score.toString().padStart(6, "0");
     if (section) section.textContent = `LEVEL ${snap.level}`;
     if (lives) lives.textContent = `${Math.max(0, snap.player.lives)} CELLS`;
@@ -363,9 +378,11 @@ export class MainScene extends Phaser.Scene {
       charge.classList.toggle("low", snap.player.charge < 25);
     }
     if (status) {
-      status.hidden = snap.message.length === 0;
+      status.hidden = snap.message.length === 0 || snap.state === "game-over";
       status.textContent = snap.message;
     }
+    if (gameOver) gameOver.hidden = snap.state !== "game-over";
+    if (finalScore) finalScore.textContent = snap.score.toString().padStart(6, "0");
   }
 
   private playInputTransitions(input: InputState): void {

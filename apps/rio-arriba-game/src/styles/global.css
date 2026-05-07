@@ -119,6 +119,52 @@ canvas {
   pointer-events: none;
 }
 
+#game-over-panel {
+  position: fixed;
+  z-index: 5;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 10px;
+  padding: 24px;
+  background: rgba(5, 15, 17, 0.72);
+  color: #effff8;
+  text-align: center;
+  pointer-events: none;
+}
+
+#game-over-panel[hidden] {
+  display: none;
+}
+
+#game-over-panel p,
+#game-over-panel strong,
+#game-over-panel span {
+  margin: 0;
+}
+
+#game-over-panel p {
+  color: #ffcf66;
+  font-size: clamp(30px, 10vw, 54px);
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+#game-over-panel strong {
+  font-size: clamp(42px, 14vw, 76px);
+  font-weight: 900;
+  color: #95ff4f;
+  text-shadow: 0 0 20px rgba(149, 255, 79, 0.36);
+}
+
+#game-over-panel span {
+  color: #c9e6e2;
+  font-size: clamp(15px, 4vw, 20px);
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
 #info-toggle {
   position: fixed;
   z-index: 3;

@@ -8,6 +8,9 @@ import {
   entitiesForRange,
   FIRST_SECTION_CHARGER_CHANCE,
   MIN_CHARGER_CHANCE,
+  MIN_CHARGER_ROW_GAP,
+  secondaryThreatChanceForSection,
+  SPAWN_ROW_SPACING,
   threatWeightsForSection
 } from "../src/systems/spawner";
 
@@ -21,9 +24,9 @@ describe("spawner charger pacing", () => {
   });
 
   it("spaces charger-eligible rows farther apart as sections progress", () => {
-    expect(chargerRowStrideForSection(0)).toBe(1);
-    expect(chargerRowStrideForSection(2)).toBe(1);
-    expect(chargerRowStrideForSection(4)).toBe(2);
+    expect(chargerRowStrideForSection(0)).toBe(MIN_CHARGER_ROW_GAP);
+    expect(chargerRowStrideForSection(2)).toBeGreaterThan(chargerRowStrideForSection(0));
+    expect(chargerRowStrideForSection(4)).toBeGreaterThan(chargerRowStrideForSection(2));
     expect(chargerRowStrideForSection(8)).toBeGreaterThan(chargerRowStrideForSection(4));
   });
 
@@ -41,9 +44,14 @@ describe("spawner charger pacing", () => {
     const earlyChargers = chargerPositionsForLevels(1, 6);
     const lateChargers = chargerPositionsForLevels(7, 12);
 
-    expect(earlyChargers.length).toBeGreaterThanOrEqual(18);
+    expect(earlyChargers.length).toBeGreaterThanOrEqual(10);
     expect(lateChargers.length).toBeGreaterThan(0);
     expect(averageGap(lateChargers)).toBeGreaterThan(averageGap(earlyChargers));
+  });
+
+  it("prevents charging stations from spawning in adjacent rows", () => {
+    const chargers = chargerPositionsForLevels(1, 12);
+    expect(minGap(chargers)).toBeGreaterThanOrEqual(SPAWN_ROW_SPACING * MIN_CHARGER_ROW_GAP);
   });
 
   it("makes chargers long enough to support sustained slow recharging", () => {
@@ -72,6 +80,26 @@ describe("spawner threat pacing", () => {
 
     expect(high.drone).toBeGreaterThan(low.drone);
     expect(high.jet).toBeGreaterThan(low.jet);
+  });
+
+  it("increases secondary enemy pressure in later sections", () => {
+    expect(secondaryThreatChanceForSection(0)).toBeLessThan(secondaryThreatChanceForSection(6));
+    expect(threatCountForLevels(1, 3)).toBeGreaterThan(18);
+  });
+});
+
+describe("spawner bridges", () => {
+  it("places one visible bridge gate near the end of every section", () => {
+    for (let section = 0; section < 8; section += 1) {
+      const fromY = section * SECTION_LENGTH;
+      const toY = (section + 1) * SECTION_LENGTH - 1;
+      const gates = entitiesForRange(fromY, toY).filter((entity) => entity.kind === "gate" && entity.y >= fromY && entity.y <= toY);
+
+      expect(gates).toHaveLength(1);
+      expect(gates[0].y).toBeGreaterThan(toY - SECTION_LENGTH * 0.16);
+      expect(gates[0].h).toBeGreaterThanOrEqual(46);
+      expect(gates[0].w).toBeGreaterThanOrEqual(160);
+    }
   });
 });
 
@@ -102,4 +130,15 @@ function averageGap(positions: number[]): number {
   const sorted = [...positions].sort((a, b) => a - b);
   const gaps = sorted.slice(1).map((position, index) => position - sorted[index]);
   return gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
+}
+
+function minGap(positions: number[]): number {
+  const sorted = [...positions].sort((a, b) => a - b);
+  return Math.min(...sorted.slice(1).map((position, index) => position - sorted[index]));
+}
+
+function threatCountForLevels(firstLevel: number, lastLevel: number): number {
+  const fromY = (firstLevel - 1) * SECTION_LENGTH;
+  const toY = lastLevel * SECTION_LENGTH - 1;
+  return entitiesForRange(fromY, toY).filter((entity) => !["charger", "gate"].includes(entity.kind)).length;
 }

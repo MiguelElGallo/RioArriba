@@ -99,6 +99,7 @@ describe("Simulation", () => {
       invulnerableMs: 0
     });
     setPrivate(sim, "entities", new Map([[target.id, target]]));
+    disableGeneratedEntities(sim);
 
     const snap = sim.update(16);
 
@@ -294,6 +295,7 @@ describe("Simulation", () => {
     const sim = new Simulation();
     startPlaying(sim);
     setPrivate(sim, "player", { ...sim.snapshot().player, x: WORLD_WIDTH / 2, y: 400, charge: 0.01, invulnerableMs: 0 });
+    disableGeneratedEntities(sim);
 
     const snap = sim.update(16);
 

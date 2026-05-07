@@ -14,13 +14,13 @@ export function riverBoundsAt(y: number): RiverBounds {
     WORLD_WIDTH / 2 +
     Math.sin(phase) * 55 +
     Math.sin(y * 0.0021 + section * 1.7) * 44;
-  const difficulty = Math.min(120, section * 12);
+  const difficulty = Math.min(240, section * 26);
   const width =
-    292 -
+    394 -
     difficulty +
-    Math.sin(y * 0.004 + 2.3) * 34 +
-    Math.sin(y * 0.011) * 16;
-  const clampedWidth = Math.max(132, Math.min(344, width));
+    Math.sin(y * 0.004 + 2.3) * 28 +
+    Math.sin(y * 0.011) * 14;
+  const clampedWidth = Math.max(118, Math.min(430, width));
   const left = Math.max(20, center - clampedWidth / 2);
   const right = Math.min(WORLD_WIDTH - 20, center + clampedWidth / 2);
 
