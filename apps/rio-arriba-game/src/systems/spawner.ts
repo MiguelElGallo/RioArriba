@@ -12,6 +12,8 @@ export const FIRST_SECTION_BARGE_WEIGHT = 0.34;
 export const MIN_BARGE_WEIGHT = 0.12;
 export const FIRST_SECTION_JET_WEIGHT = 0.28;
 export const MAX_JET_WEIGHT = 0.52;
+export const CHARGER_WIDTH = 58;
+export const CHARGER_HEIGHT = 160;
 
 export interface ThreatWeights {
   barge: number;
@@ -87,8 +89,8 @@ export function entitiesForRange(fromY: number, toY: number): EntityState[] {
         kind: "charger",
         x: bounds.left + room * (0.24 + random(row) * 0.52),
         y,
-        w: 42,
-        h: 48,
+        w: CHARGER_WIDTH,
+        h: CHARGER_HEIGHT,
         vx: 0,
         alive: true
       });

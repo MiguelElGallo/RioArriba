@@ -6,6 +6,9 @@ const PLAYER_RADIUS = 18;
 const FIRE_INTERVAL_MS = 170;
 const SHOT_HIT_WIDTH = 72;
 const SHOT_HIT_HEIGHT = 34;
+const SLOW_SPEED = 95;
+const CHARGER_RECHARGE_PER_SECOND = 70;
+const RECHARGE_SOUND_INTERVAL_MS = 320;
 
 export class Simulation {
   private player: PlayerState = {
@@ -28,6 +31,8 @@ export class Simulation {
   private state: GameSnapshot["state"] = "ready";
   private message = "HOLD TO STEER - TAP ELSEWHERE TO FIRE";
   private fireCooldownMs = 0;
+  private rechargeSoundCooldownMs = 0;
+  private frameDt = 0;
   private checkpointY = 80;
   private soundCues: GameSnapshot["soundCues"] = [];
 
@@ -44,10 +49,12 @@ export class Simulation {
 
   update(deltaMs: number): GameSnapshot {
     const dt = Math.min(0.05, deltaMs / 1000);
+    this.frameDt = dt;
     this.soundCues = [];
     if (this.state !== "playing") return this.snapshot();
 
     this.fireCooldownMs = Math.max(0, this.fireCooldownMs - deltaMs);
+    this.rechargeSoundCooldownMs = Math.max(0, this.rechargeSoundCooldownMs - deltaMs);
     this.player.invulnerableMs = Math.max(0, this.player.invulnerableMs - deltaMs);
     this.updatePlayer(dt);
     this.ensureEntities();
@@ -144,9 +151,7 @@ export class Simulation {
       if (!entity.alive) continue;
       if (overlaps(this.player.x, this.player.y, 34, 42, entity.x, entity.y, entity.w, entity.h)) {
         if (ENTITY_RULES[entity.kind].playerContact === "recharge") {
-          this.player.charge = Math.min(100, this.player.charge + (this.input.down ? 34 : 18));
-          entity.alive = false;
-          this.soundCues.push("recharge");
+          this.rechargeFromStation();
         } else if (ENTITY_RULES[entity.kind].playerContact === "crash" && this.player.invulnerableMs === 0) {
           this.crash(ENTITY_RULES[entity.kind].collisionMessage ?? "COLLISION");
         }
@@ -192,12 +197,24 @@ export class Simulation {
     };
     this.score = score;
     this.level = level;
+    this.rechargeSoundCooldownMs = 0;
     this.entities.clear();
     if (full) this.destroyedEntityIds.clear();
     this.shots = [];
     this.soundCues = [];
     this.state = "playing";
     this.message = "";
+  }
+
+  private rechargeFromStation(): void {
+    if (this.player.charge >= 100) return;
+    const speedFactor = Math.max(0.72, Math.min(1, SLOW_SPEED / Math.max(SLOW_SPEED, this.player.speed)));
+    const gained = CHARGER_RECHARGE_PER_SECOND * speedFactor * this.frameDt;
+    this.player.charge = Math.min(100, this.player.charge + gained);
+    if (this.rechargeSoundCooldownMs === 0) {
+      this.soundCues.push("recharge");
+      this.rechargeSoundCooldownMs = RECHARGE_SOUND_INTERVAL_MS;
+    }
   }
 }
 

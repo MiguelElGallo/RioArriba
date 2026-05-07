@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { SECTION_LENGTH } from "../src/systems/river";
 import {
   chargerChanceForSection,
+  CHARGER_HEIGHT,
+  CHARGER_WIDTH,
   chargerRowStrideForSection,
   entitiesForRange,
   FIRST_SECTION_CHARGER_CHANCE,
@@ -42,6 +44,15 @@ describe("spawner charger pacing", () => {
     expect(earlyChargers.length).toBeGreaterThanOrEqual(18);
     expect(lateChargers.length).toBeGreaterThan(0);
     expect(averageGap(lateChargers)).toBeGreaterThan(averageGap(earlyChargers));
+  });
+
+  it("makes chargers long enough to support sustained slow recharging", () => {
+    const charger = entitiesForRange(0, SECTION_LENGTH).find((entity) => entity.kind === "charger");
+
+    expect(charger).toBeDefined();
+    expect(charger!.w).toBe(CHARGER_WIDTH);
+    expect(charger!.h).toBe(CHARGER_HEIGHT);
+    expect(charger!.h).toBeGreaterThanOrEqual(150);
   });
 });
 

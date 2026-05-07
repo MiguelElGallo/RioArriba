@@ -219,22 +219,27 @@ export class MainScene extends Phaser.Scene {
     if (y < HUD_CLEARANCE || y > this.viewH() + 80) return;
     if (entity.kind === "charger") {
       this.drawTargetReticle(g, entity.x, y, 0x95ff4f, 0.45);
+      const h = entity.h;
       g.fillStyle(0x0d2d28, 1);
-      g.fillRoundedRect(entity.x - 24, y - 27, 48, 54, 8);
+      g.fillRoundedRect(entity.x - entity.w / 2, y - h / 2, entity.w, h, 8);
+      g.fillStyle(0x143f38, 1);
+      g.fillRoundedRect(entity.x - 18, y - h / 2 + 10, 36, h - 20, 6);
       g.fillStyle(0x95ff4f, 1);
-      g.fillRect(entity.x + 8, y - 36, 12, 9);
+      g.fillRect(entity.x + 10, y - h / 2 - 9, 14, 9);
       g.lineStyle(3, 0xb6ff70, 1);
-      g.strokeRoundedRect(entity.x - 24, y - 27, 48, 54, 8);
+      g.strokeRoundedRect(entity.x - entity.w / 2, y - h / 2, entity.w, h, 8);
       g.lineStyle(4, 0xd8ff70, 1);
       g.beginPath();
-      g.moveTo(entity.x + 3, y - 18);
-      g.lineTo(entity.x - 8, y + 2);
-      g.lineTo(entity.x + 5, y + 2);
-      g.lineTo(entity.x - 4, y + 20);
+      g.moveTo(entity.x + 3, y - 28);
+      g.lineTo(entity.x - 10, y);
+      g.lineTo(entity.x + 5, y);
+      g.lineTo(entity.x - 6, y + 30);
       g.strokePath();
       g.lineStyle(2, 0x7fffe1, 1);
-      g.lineBetween(entity.x - 15, y + 30, entity.x - 15, y + 40);
-      g.lineBetween(entity.x + 15, y + 30, entity.x + 15, y + 40);
+      for (let railY = y - h / 2 + 22; railY < y + h / 2 - 10; railY += 24) {
+        g.lineBetween(entity.x - entity.w / 2 + 9, railY, entity.x - 24, railY + 8);
+        g.lineBetween(entity.x + entity.w / 2 - 9, railY, entity.x + 24, railY + 8);
+      }
       return;
     }
     if (entity.kind === "gate") {

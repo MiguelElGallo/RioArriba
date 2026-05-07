@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Simulation } from "../src/systems/simulation";
 import { riverBoundsAt, SECTION_LENGTH, WORLD_WIDTH } from "../src/systems/river";
-import { entitiesForRange } from "../src/systems/spawner";
+import { CHARGER_HEIGHT, CHARGER_WIDTH, entitiesForRange } from "../src/systems/spawner";
 import { ENTITY_RULES, EntityKind, EntityState, InputState, PlayerState, ShotState } from "../src/systems/types";
 
 function setPrivate<T>(simulation: Simulation, key: string, value: T): void {
@@ -13,14 +13,18 @@ function startPlaying(sim: Simulation, input: Partial<InputState> = {}): void {
   setPrivate(sim, "input", { left: false, right: false, up: false, down: false, fire: false, ...input });
 }
 
+function disableGeneratedEntities(sim: Simulation): void {
+  (sim as unknown as { ensureEntities: () => void }).ensureEntities = () => {};
+}
+
 function entity(kind: EntityKind, overrides: Partial<EntityState> = {}): EntityState {
   return {
     id: `${kind}-test`,
     kind,
     x: WORLD_WIDTH / 2,
     y: 400,
-    w: kind === "gate" ? 120 : kind === "barge" ? 54 : kind === "charger" ? 42 : 38,
-    h: kind === "gate" ? 28 : kind === "barge" ? 42 : kind === "charger" ? 48 : 34,
+    w: kind === "gate" ? 120 : kind === "barge" ? 54 : kind === "charger" ? CHARGER_WIDTH : 38,
+    h: kind === "gate" ? 28 : kind === "barge" ? 42 : kind === "charger" ? CHARGER_HEIGHT : 34,
     vx: 0,
     alive: true,
     ...overrides
@@ -187,7 +191,7 @@ describe("Simulation", () => {
     expect(sim.update(16).entities.some((candidate) => candidate.id === target!.id)).toBe(false);
   });
 
-  it("consumes a charger after a single recharge collision", () => {
+  it("recharges over time without consuming the charging station", () => {
     const sim = new Simulation();
     sim.setInput({ fire: true });
     sim.setInput({ fire: false });
@@ -203,8 +207,8 @@ describe("Simulation", () => {
       kind: "charger",
       x: player.x,
       y: player.y,
-      w: 42,
-      h: 48,
+      w: CHARGER_WIDTH,
+      h: CHARGER_HEIGHT,
       vx: 0,
       alive: true
     };
@@ -212,32 +216,54 @@ describe("Simulation", () => {
     setPrivate(sim, "player", player);
     setPrivate(sim, "entities", new Map([[charger.id, charger]]));
     setPrivate(sim, "input", { left: false, right: false, up: false, down: false, fire: false });
+    disableGeneratedEntities(sim);
 
-    sim.update(16);
+    sim.update(100);
     const afterFirstPickup = sim.snapshot();
-    sim.update(16);
+    sim.update(100);
     const afterSecondFrame = sim.snapshot();
 
     expect(afterFirstPickup.player.charge).toBeGreaterThan(40);
-    expect(afterSecondFrame.player.charge).toBeLessThan(afterFirstPickup.player.charge);
-    expect(afterSecondFrame.entities.some((entity) => entity.id === charger.id)).toBe(false);
+    expect(afterSecondFrame.player.charge).toBeGreaterThan(afterFirstPickup.player.charge);
+    expect(afterSecondFrame.entities.some((entity) => entity.id === charger.id)).toBe(true);
   });
 
-  it("recharges more when slowing and caps charge at full", () => {
-    expect(rechargeFrom(40, false).player.charge).toBe(58);
-    expect(rechargeFrom(40, true).player.charge).toBe(74);
-    expect(rechargeFrom(90, true).player.charge).toBe(100);
+  it("recharges more at slow speed and caps charge at full", () => {
+    const normal = rechargeFrom(40, {}, 165, 1000).player.charge;
+    const slow = rechargeFrom(40, { down: true }, 95, 1000).player.charge;
+
+    expect(normal).toBeGreaterThan(40);
+    expect(slow).toBeGreaterThan(normal + 10);
+    expect(rechargeFrom(90, { down: true }, 95, 1000).player.charge).toBe(100);
   });
 
-  it("emits recharge and clears sound cues on the next quiet update", () => {
+  it("lets a full slow pass through a long charger restore enough charge to cap at full", () => {
+    const sim = new Simulation();
+    startPlaying(sim, { down: true });
+    const charger = entity("charger", { y: 520 });
+    const startY = charger.y - charger.h / 2 - 21;
+    setPrivate(sim, "player", { ...sim.snapshot().player, x: charger.x, y: startY, speed: 95, charge: 1, invulnerableMs: 0 });
+    setPrivate(sim, "entities", new Map([[charger.id, charger]]));
+    disableGeneratedEntities(sim);
+
+    for (let elapsed = 0; elapsed < 2100; elapsed += 50) sim.update(50);
+
+    const snap = sim.snapshot();
+    expect(snap.player.y).toBeGreaterThan(charger.y + charger.h / 2);
+    expect(snap.player.charge).toBe(100);
+  });
+
+  it("emits recharge intermittently while overlapping and clears sound cues on quiet updates", () => {
     const sim = new Simulation();
     startPlaying(sim);
     const charger = entity("charger");
     setPrivate(sim, "player", { ...sim.snapshot().player, x: charger.x, y: charger.y, charge: 50 });
     setPrivate(sim, "entities", new Map([[charger.id, charger]]));
+    disableGeneratedEntities(sim);
 
-    expect(sim.update(0).soundCues).toEqual(["recharge"]);
-    expect(sim.update(0).soundCues).toEqual([]);
+    expect(sim.update(50).soundCues).toEqual(["recharge"]);
+    expect(sim.update(50).soundCues).toEqual([]);
+    expect(sim.update(320).soundCues).toEqual(["recharge"]);
   });
 
   it("reports bridge collision message and sound when the player hits a gate", () => {
@@ -315,11 +341,14 @@ describe("Simulation", () => {
   });
 });
 
-function rechargeFrom(charge: number, down: boolean) {
+function rechargeFrom(charge: number, input: Partial<InputState>, speed: number, totalMs: number) {
   const sim = new Simulation();
-  startPlaying(sim, { down });
+  startPlaying(sim, input);
   const charger = entity("charger");
-  setPrivate(sim, "player", { ...sim.snapshot().player, x: charger.x, y: charger.y, charge });
+  setPrivate(sim, "player", { ...sim.snapshot().player, x: charger.x, y: charger.y, speed, charge });
   setPrivate(sim, "entities", new Map([[charger.id, charger]]));
-  return sim.update(0);
+  disableGeneratedEntities(sim);
+  let snap = sim.snapshot();
+  for (let elapsed = 0; elapsed < totalMs; elapsed += 50) snap = sim.update(50);
+  return snap;
 }

@@ -15,7 +15,7 @@ export const ENTITY_RULES: Record<EntityKind, EntityRules> = {
   drone: { displayName: "Drone", description: "Rotor aircraft crossing the river.", shootable: true, score: 60, playerContact: "crash" },
   charger: {
     displayName: "Charger",
-    description: "Fly over to recharge. Shoot for points.",
+    description: "Fly over slowly to recharge over time. Shoot for points.",
     shootable: true,
     score: 80,
     playerContact: "recharge"
