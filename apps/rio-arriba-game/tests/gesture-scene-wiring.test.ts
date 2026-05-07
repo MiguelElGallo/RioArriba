@@ -10,5 +10,6 @@ describe("gesture scene wiring", () => {
     expect(sceneSource).toContain("bindGestureControls()");
     expect(sceneSource).toContain('interactiveTarget.on("pointerdown"');
     expect(sceneSource).toContain('interactiveTarget.on("pointercancel"');
+    expect(sceneSource).toContain('document.getElementById("hud")');
   });
 });

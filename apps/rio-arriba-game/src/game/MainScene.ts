@@ -89,6 +89,12 @@ export class MainScene extends Phaser.Scene {
 
   private bindGestureControls(): void {
     const interactiveTarget = this.input;
+    const hud = document.getElementById("hud");
+    hud?.addEventListener("pointerdown", (event) => event.stopPropagation());
+    hud?.addEventListener("pointermove", (event) => event.stopPropagation());
+    hud?.addEventListener("pointerup", (event) => event.stopPropagation());
+    hud?.addEventListener("pointercancel", (event) => event.stopPropagation());
+
     const point = (pointer: Phaser.Input.Pointer) => ({
       pointerId: pointer.id,
       x: pointer.x,

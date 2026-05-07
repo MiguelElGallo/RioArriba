@@ -60,7 +60,7 @@ canvas {
   right: max(10px, env(safe-area-inset-right));
   display: grid;
   gap: 7px;
-  pointer-events: none;
+  pointer-events: auto;
   text-shadow: 0 2px 0 rgba(0, 0, 0, 0.55);
 }
 
