@@ -1,7 +1,9 @@
 import { defineConfig } from "vite";
 
+const isPreview = process.env.npm_lifecycle_event === "preview";
+
 export default defineConfig(({ command }) => ({
-  base: command === "build" ? "/RioArriba/" : "/",
+  base: command === "build" || isPreview ? "/RioArriba/" : "/",
   server: {
     port: 5173
   },

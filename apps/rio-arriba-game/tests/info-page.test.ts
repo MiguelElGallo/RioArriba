@@ -4,6 +4,7 @@ import { ENTITY_RULES } from "../src/systems/types";
 
 const html = readFileSync(new URL("../index.html", import.meta.url), "utf8");
 const mainSource = readFileSync(new URL("../src/main.ts", import.meta.url), "utf8");
+const viteConfig = readFileSync(new URL("../vite.config.ts", import.meta.url), "utf8");
 
 describe("info page", () => {
   it("exposes an accessible icons and points panel", () => {
@@ -23,5 +24,11 @@ describe("info page", () => {
     expect(mainSource).toContain('document.getElementById("info-panel")');
     expect(mainSource).toContain('document.getElementById("info-list")');
     expect(mainSource).toContain('addEventListener("click"');
+  });
+
+  it("keeps local and GitHub Pages publish assumptions explicit", () => {
+    expect(html).toContain("http://localhost:5173/");
+    expect(html).not.toContain("http://localhost:5176/");
+    expect(viteConfig).toContain('base: command === "build" || isPreview ? "/RioArriba/" : "/"');
   });
 });

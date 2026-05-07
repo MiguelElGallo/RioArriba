@@ -34,6 +34,15 @@ describe("spawner charger pacing", () => {
     expect(early).toBeGreaterThan(middle);
     expect(middle).toBeGreaterThan(late);
   });
+
+  it("keeps more chargers overall while making later chargers farther apart", () => {
+    const earlyChargers = chargerPositionsForLevels(1, 6);
+    const lateChargers = chargerPositionsForLevels(7, 12);
+
+    expect(earlyChargers.length).toBeGreaterThanOrEqual(18);
+    expect(lateChargers.length).toBeGreaterThan(0);
+    expect(averageGap(lateChargers)).toBeGreaterThan(averageGap(earlyChargers));
+  });
 });
 
 describe("spawner threat pacing", () => {
@@ -56,9 +65,15 @@ describe("spawner threat pacing", () => {
 });
 
 function chargerCountForLevels(firstLevel: number, lastLevel: number): number {
+  return chargerPositionsForLevels(firstLevel, lastLevel).length;
+}
+
+function chargerPositionsForLevels(firstLevel: number, lastLevel: number): number[] {
   const fromY = (firstLevel - 1) * SECTION_LENGTH;
   const toY = lastLevel * SECTION_LENGTH - 1;
-  return entitiesForRange(fromY, toY).filter((entity) => entity.kind === "charger").length;
+  return entitiesForRange(fromY, toY)
+    .filter((entity) => entity.kind === "charger")
+    .map((entity) => entity.y);
 }
 
 function threatCountsForLevels(firstLevel: number, lastLevel: number): { drone: number; jet: number } {
@@ -70,4 +85,10 @@ function threatCountsForLevels(firstLevel: number, lastLevel: number): { drone: 
     drone: entities.filter((entity) => entity.kind === "drone").length,
     jet: entities.filter((entity) => entity.kind === "jet").length
   };
+}
+
+function averageGap(positions: number[]): number {
+  const sorted = [...positions].sort((a, b) => a - b);
+  const gaps = sorted.slice(1).map((position, index) => position - sorted[index]);
+  return gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
 }
