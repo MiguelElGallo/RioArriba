@@ -6,12 +6,13 @@ const sceneSource = readFileSync(new URL("../src/game/MainScene.ts", import.meta
 describe("gesture scene wiring", () => {
   it("keeps MainScene wired to the tested gesture input adapter", () => {
     expect(sceneSource).toContain("GestureInputController");
-    expect(sceneSource).toContain("joystickDeadZonePx");
+    expect(sceneSource).toContain("dragDeadZonePx");
+    expect(sceneSource).toContain("isFireZone");
     expect(sceneSource).toContain("this.input.addPointer(2)");
     expect(sceneSource).toContain("mergeInputStates");
     expect(sceneSource).toContain("bindGestureControls()");
-    expect(sceneSource).toContain("drawJoystick()");
-    expect(sceneSource).toContain("joystickVisualState()");
+    expect(sceneSource).toContain("drawTouchControl()");
+    expect(sceneSource).toContain("touchControlVisualState");
     expect(sceneSource).toContain('interactiveTarget.on("pointerdown"');
     expect(sceneSource).toContain('interactiveTarget.on("pointercancel"');
     expect(sceneSource).toContain('document.getElementById("hud")');

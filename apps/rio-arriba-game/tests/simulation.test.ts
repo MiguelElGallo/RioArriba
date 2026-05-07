@@ -53,6 +53,16 @@ describe("Simulation", () => {
     expect(slow.snapshot().player.charge).toBeCloseTo(fast.snapshot().player.charge, 4);
   });
 
+  it("steers toward a touch target without requiring binary left or right input", () => {
+    const sim = new Simulation();
+    startPlaying(sim, { steerTargetX: WORLD_WIDTH / 2 + 90 });
+    const startX = sim.snapshot().player.x;
+
+    sim.update(250);
+
+    expect(sim.snapshot().player.x).toBeGreaterThan(startX);
+  });
+
   it("spawns electric shots while fire is held", () => {
     const sim = new Simulation();
     sim.setInput({ fire: true });

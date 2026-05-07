@@ -10,7 +10,7 @@ const HUD_CLEARANCE = 54;
 export class MainScene extends Phaser.Scene {
   private simulation = new Simulation();
   private audio = new AudioDirector();
-  private gestureInput = new GestureInputController({ joystickDeadZonePx: 8, joystickRadiusPx: 44, firePulseMs: 170 });
+  private gestureInput = new GestureInputController({ dragDeadZonePx: 8, speedThresholdPx: 46, steerScale: 1.18, firePulseMs: 170 });
   private graphics!: Phaser.GameObjects.Graphics;
   private controlsGraphics!: Phaser.GameObjects.Graphics;
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
@@ -45,7 +45,7 @@ export class MainScene extends Phaser.Scene {
     this.simulation.setInput(input);
     const snap = this.simulation.update(delta);
     this.draw(snap);
-    this.drawJoystick();
+    this.drawTouchControl();
     this.updateHud(snap);
     this.audio.updateEngine(snap.state === "playing", snap.player.speed);
     for (const cue of snap.soundCues) this.audio.playCue(cue);
@@ -103,7 +103,9 @@ export class MainScene extends Phaser.Scene {
       pointerId: pointer.id,
       x: pointer.x,
       y: pointer.y,
-      timeMs: this.time.now
+      timeMs: this.time.now,
+      playerX: this.simulation.snapshot().player.x,
+      isFireZone: this.isFireZone(pointer)
     });
 
     interactiveTarget.on("pointerdown", (pointer: Phaser.Input.Pointer, currentlyOver: unknown[] = []) => {
@@ -139,23 +141,39 @@ export class MainScene extends Phaser.Scene {
     );
   }
 
-  private drawJoystick(): void {
-    const joystick = this.gestureInput.joystickVisualState();
+  private drawTouchControl(): void {
+    const touch = this.gestureInput.touchControlVisualState(this.time.now);
     const g = this.controlsGraphics;
     g.clear();
-    if (!joystick.active) return;
+    if (touch.active) {
+      g.lineStyle(3, 0x8cfffb, 0.38);
+      g.lineBetween(touch.originX, touch.originY, touch.x, touch.y);
+      g.fillStyle(0x8cfffb, 0.18);
+      g.fillCircle(touch.originX, touch.originY, 18);
+      g.lineStyle(2, 0x8cfffb, 0.64);
+      g.strokeCircle(touch.originX, touch.originY, 18);
+      g.fillStyle(0x95ff4f, 0.84);
+      g.fillCircle(touch.x, touch.y, 12);
+      g.lineStyle(2, 0xffffff, 0.72);
+      g.strokeCircle(touch.x, touch.y, 12);
+      if (touch.targetX !== undefined) {
+        g.lineStyle(2, 0x95ff4f, 0.5);
+        g.lineBetween(this.originX() + touch.targetX, this.playerScreenY() - 32, this.originX() + touch.targetX, this.playerScreenY() + 36);
+      }
+    }
 
-    g.lineStyle(2, 0x8cfffb, 0.68);
-    g.fillStyle(0x071718, 0.26);
-    g.fillCircle(joystick.originX, joystick.originY, joystick.radius);
-    g.strokeCircle(joystick.originX, joystick.originY, joystick.radius);
-    g.lineStyle(2, 0x95ff4f, 0.4);
-    g.lineBetween(joystick.originX - 16, joystick.originY, joystick.originX + 16, joystick.originY);
-    g.lineBetween(joystick.originX, joystick.originY - 16, joystick.originX, joystick.originY + 16);
-    g.fillStyle(0x95ff4f, 0.84);
-    g.fillCircle(joystick.knobX, joystick.knobY, 15);
-    g.lineStyle(2, 0xffffff, 0.78);
-    g.strokeCircle(joystick.knobX, joystick.knobY, 15);
+    if (touch.fireActive) {
+      const x = this.scale.width - Math.max(54, this.scale.width * 0.13);
+      const y = this.scale.height - Math.max(82, this.scale.height * 0.13);
+      g.fillStyle(0x95ff4f, 0.22);
+      g.fillCircle(x, y, 42);
+      g.lineStyle(3, 0xd8ff70, 0.8);
+      g.strokeCircle(x, y, 42);
+    }
+  }
+
+  private isFireZone(pointer: Phaser.Input.Pointer): boolean {
+    return pointer.x >= this.scale.width * 0.62 && pointer.y > HUD_CLEARANCE;
   }
 
   private drawTerrain(g: Phaser.GameObjects.Graphics, playerY: number): void {

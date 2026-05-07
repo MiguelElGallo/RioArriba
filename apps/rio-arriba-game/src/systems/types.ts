@@ -37,6 +37,7 @@ export interface InputState {
   up: boolean;
   down: boolean;
   fire: boolean;
+  steerTargetX?: number;
 }
 
 export interface PlayerState {

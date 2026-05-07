@@ -9,6 +9,8 @@ const SHOT_HIT_HEIGHT = 34;
 const SLOW_SPEED = 95;
 const CHARGER_RECHARGE_PER_SECOND = 70;
 const RECHARGE_SOUND_INTERVAL_MS = 320;
+const TOUCH_STEER_GAIN = 7.5;
+const TOUCH_MAX_VX = 285;
 
 export class Simulation {
   private player: PlayerState = {
@@ -29,7 +31,7 @@ export class Simulation {
   private score = 0;
   private level = 1;
   private state: GameSnapshot["state"] = "ready";
-  private message = "HOLD TO STEER - TAP ELSEWHERE TO FIRE";
+  private message = "DRAG LEFT SIDE - TAP RIGHT TO FIRE";
   private fireCooldownMs = 0;
   private rechargeSoundCooldownMs = 0;
   private frameDt = 0;
@@ -84,8 +86,14 @@ export class Simulation {
   private updatePlayer(dt: number): void {
     const targetSpeed = this.input.up ? 265 : this.input.down ? 95 : 165;
     this.player.speed += (targetSpeed - this.player.speed) * Math.min(1, dt * 5);
-    const thrust = (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
-    this.player.vx += thrust * 720 * dt;
+    if (this.input.steerTargetX !== undefined) {
+      const error = clamp(this.input.steerTargetX, 18, WORLD_WIDTH - 18) - this.player.x;
+      const targetVx = clamp(error * TOUCH_STEER_GAIN, -TOUCH_MAX_VX, TOUCH_MAX_VX);
+      this.player.vx += (targetVx - this.player.vx) * Math.min(1, dt * 9);
+    } else {
+      const thrust = (this.input.right ? 1 : 0) - (this.input.left ? 1 : 0);
+      this.player.vx += thrust * 720 * dt;
+    }
     this.player.vx *= Math.pow(0.002, dt);
     this.player.x += this.player.vx * dt;
     this.player.y += this.player.speed * dt;
@@ -220,4 +228,8 @@ export class Simulation {
 
 function overlaps(ax: number, ay: number, aw: number, ah: number, bx: number, by: number, bw: number, bh: number): boolean {
   return Math.abs(ax - bx) * 2 < aw + bw && Math.abs(ay - by) * 2 < ah + bh;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }

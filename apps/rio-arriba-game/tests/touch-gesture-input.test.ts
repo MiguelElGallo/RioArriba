@@ -9,25 +9,27 @@ describe("GestureInputController", () => {
     expect(input.pointerMove({ pointerId: 1, x: 119, y: 81, timeMs: 16 })).toEqual(EMPTY_INPUT_STATE);
   });
 
-  it("maps the first pointer drag to directional input on both axes", () => {
-    const input = new GestureInputController({ dragThresholdPx: 20 });
+  it("maps relative horizontal drag to a steering target and vertical drag to speed", () => {
+    const input = new GestureInputController({ dragThresholdPx: 20, speedThresholdPx: 20, steerScale: 1 });
 
-    input.pointerDown({ pointerId: 1, x: 100, y: 100, timeMs: 0 });
+    input.pointerDown({ pointerId: 1, x: 100, y: 100, timeMs: 0, playerX: 240 });
 
     expect(input.pointerMove({ pointerId: 1, x: 130, y: 70, timeMs: 16 })).toEqual({
       left: false,
-      right: true,
+      right: false,
       up: true,
       down: false,
-      fire: false
+      fire: false,
+      steerTargetX: 270
     });
 
     expect(input.pointerMove({ pointerId: 1, x: 70, y: 130, timeMs: 32 })).toEqual({
-      left: true,
+      left: false,
       right: false,
       up: false,
       down: true,
-      fire: false
+      fire: false,
+      steerTargetX: 210
     });
   });
 
@@ -42,30 +44,31 @@ describe("GestureInputController", () => {
       right: false,
       up: false,
       down: false,
-      fire: true
+      fire: false
     });
   });
 
-  it("fires a pulse when a second pointer taps while the first pointer controls direction", () => {
-    const input = new GestureInputController({ dragThresholdPx: 20, firePulseMs: 120 });
+  it("fires a pulse when a second pointer taps the fire zone while the first pointer controls direction", () => {
+    const input = new GestureInputController({ dragThresholdPx: 20, firePulseMs: 120, steerScale: 1 });
 
-    input.pointerDown({ pointerId: 1, x: 100, y: 100, timeMs: 0 });
+    input.pointerDown({ pointerId: 1, x: 100, y: 100, timeMs: 0, playerX: 240 });
     input.pointerMove({ pointerId: 1, x: 130, y: 100, timeMs: 16 });
 
-    expect(input.pointerDown({ pointerId: 2, x: 220, y: 180, timeMs: 20 })).toEqual({
+    expect(input.pointerDown({ pointerId: 2, x: 220, y: 180, timeMs: 20, isFireZone: true })).toEqual({
       left: false,
-      right: true,
+      right: false,
       up: false,
       down: false,
-      fire: true
+      fire: true,
+      steerTargetX: 270
     });
     expect(input.pointerUp({ pointerId: 2, x: 220, y: 180, timeMs: 24 }).fire).toBe(true);
     expect(input.stateAt(139).fire).toBe(true);
     expect(input.stateAt(140).fire).toBe(false);
   });
 
-  it("fires when a second pointer taps while the first pointer is held as a joystick", () => {
-    const input = new GestureInputController({ joystickDeadZonePx: 8, firePulseMs: 120 });
+  it("ignores a second pointer outside the fire zone while the first pointer steers", () => {
+    const input = new GestureInputController({ dragDeadZonePx: 8, firePulseMs: 120 });
 
     expect(input.pointerDown({ pointerId: 1, x: 96, y: 520, timeMs: 0 })).toEqual(EMPTY_INPUT_STATE);
 
@@ -74,34 +77,81 @@ describe("GestureInputController", () => {
       right: false,
       up: false,
       down: false,
-      fire: true
+      fire: false
     });
   });
 
-  it("uses small joystick movement for direction and clamps the visual knob", () => {
-    const input = new GestureInputController({ joystickDeadZonePx: 8, joystickRadiusPx: 30 });
+  it("uses small drag movement for target steering and exposes touch visual state", () => {
+    const input = new GestureInputController({ dragDeadZonePx: 8, speedThresholdPx: 8, steerScale: 1 });
 
-    input.pointerDown({ pointerId: 1, x: 100, y: 100, timeMs: 0 });
+    input.pointerDown({ pointerId: 1, x: 100, y: 100, timeMs: 0, playerX: 240 });
     expect(input.pointerMove({ pointerId: 1, x: 109, y: 91, timeMs: 16 })).toEqual({
       left: false,
-      right: true,
+      right: false,
       up: true,
       down: false,
-      fire: false
+      fire: false,
+      steerTargetX: 249
     });
 
     input.pointerMove({ pointerId: 1, x: 160, y: 100, timeMs: 32 });
-    expect(input.joystickVisualState()).toEqual({
+    expect(input.touchControlVisualState()).toEqual({
       active: true,
       originX: 100,
       originY: 100,
-      knobX: 130,
-      knobY: 100,
-      radius: 30
+      x: 160,
+      y: 100,
+      targetX: 300,
+      fireActive: false
     });
   });
 
-  it("fires on a quick primary tap when no drag is active", () => {
+  it("fires from the right-side fire zone without taking steering ownership", () => {
+    const input = new GestureInputController({ dragDeadZonePx: 8, firePulseMs: 120 });
+
+    expect(input.pointerDown({ pointerId: 1, x: 340, y: 640, timeMs: 0, isFireZone: true })).toEqual({
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      fire: true
+    });
+    expect(input.pointerMove({ pointerId: 1, x: 210, y: 620, timeMs: 20 })).toEqual({
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      fire: true
+    });
+    expect(input.stateAt(300).fire).toBe(true);
+    expect(input.pointerUp({ pointerId: 1, x: 210, y: 620, timeMs: 320 }).fire).toBe(false);
+  });
+
+  it("keeps steering active while a right-side fire pointer is held", () => {
+    const input = new GestureInputController({ dragDeadZonePx: 8, firePulseMs: 120, steerScale: 1 });
+
+    input.pointerDown({ pointerId: 1, x: 90, y: 600, timeMs: 0, playerX: 240 });
+    input.pointerMove({ pointerId: 1, x: 120, y: 600, timeMs: 16 });
+
+    expect(input.pointerDown({ pointerId: 2, x: 340, y: 620, timeMs: 20, isFireZone: true })).toEqual({
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      fire: true,
+      steerTargetX: 270
+    });
+    expect(input.pointerUp({ pointerId: 2, x: 340, y: 620, timeMs: 40 })).toEqual({
+      left: false,
+      right: false,
+      up: false,
+      down: false,
+      fire: true,
+      steerTargetX: 270
+    });
+  });
+
+  it("does not fire on a quick steering-zone tap", () => {
     const input = new GestureInputController({ dragThresholdPx: 20, firePulseMs: 120, tapMaxMs: 180 });
 
     input.pointerDown({ pointerId: 1, x: 100, y: 100, timeMs: 0 });
@@ -111,7 +161,7 @@ describe("GestureInputController", () => {
       right: false,
       up: false,
       down: false,
-      fire: true
+      fire: false
     });
   });
 
@@ -152,7 +202,7 @@ describe("GestureInputController", () => {
 describe("mergeInputStates", () => {
   it("combines keyboard, touch button, and gesture states without mutating inputs", () => {
     const keyboard = { left: true, right: false, up: false, down: false, fire: false };
-    const gesture = { left: false, right: true, up: true, down: false, fire: false };
+    const gesture = { left: false, right: true, up: true, down: false, fire: false, steerTargetX: 260 };
     const buttons = { fire: true };
 
     expect(mergeInputStates(keyboard, gesture, buttons)).toEqual({
@@ -160,7 +210,8 @@ describe("mergeInputStates", () => {
       right: true,
       up: true,
       down: false,
-      fire: true
+      fire: true,
+      steerTargetX: 260
     });
     expect(keyboard).toEqual({ left: true, right: false, up: false, down: false, fire: false });
   });
