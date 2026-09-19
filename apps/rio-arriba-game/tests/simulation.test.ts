@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Simulation } from "../src/systems/simulation";
 import { riverBoundsAt, SECTION_LENGTH, WORLD_WIDTH } from "../src/systems/river";
 import { CHARGER_HEIGHT, CHARGER_WIDTH, entitiesForRange } from "../src/systems/spawner";
-import { ENTITY_RULES, EntityKind, EntityState, InputState, PlayerState, ShotState } from "../src/systems/types";
+import { ENTITY_RULES, EntityKind, EntityState, InputState, PlayerState, ShotState, WEAPON_RULES } from "../src/systems/types";
 
 function setPrivate<T>(simulation: Simulation, key: string, value: T): void {
   (simulation as unknown as Record<string, T>)[key] = value;
@@ -27,6 +27,8 @@ function entity(kind: EntityKind, overrides: Partial<EntityState> = {}): EntityS
     h: kind === "gate" ? 28 : kind === "barge" ? 42 : kind === "charger" ? CHARGER_HEIGHT : 34,
     vx: 0,
     alive: true,
+    health: ENTITY_RULES[kind].maxHealth,
+    hitFlashMs: 0,
     ...overrides
   };
 }
@@ -69,7 +71,7 @@ describe("Simulation", () => {
     const firstShot = sim.update(16);
     expect(firstShot.shots.length).toBe(1);
     expect(firstShot.soundCues).toEqual(["fire"]);
-    sim.update(200);
+    for (let i = 0; i < 4; i++) sim.update(50);
     expect(sim.snapshot().shots.length).toBeGreaterThan(1);
   });
 
@@ -86,9 +88,9 @@ describe("Simulation", () => {
     }
   });
 
-  it("fires shots in forward world coordinates so they can hit real targets ahead of the player", () => {
+  it("fires missiles in forward world coordinates so they can hit real targets ahead of the player", () => {
     const sim = new Simulation();
-    startPlaying(sim, { fire: true });
+    startPlaying(sim, { missile: true });
     const startY = 400;
     const target = entity("drone", { y: startY + 45 });
 
@@ -105,14 +107,14 @@ describe("Simulation", () => {
 
     expect(snap.entities.some((candidate) => candidate.id === target.id)).toBe(false);
     expect(snap.score).toBe(ENTITY_RULES.drone.score);
-    expect(snap.soundCues).toEqual(["fire", "hit"]);
+    expect(snap.soundCues).toEqual(["missile", "hit"]);
   });
 
-  it("gives electric shots enough hit area for practical mobile aiming", () => {
+  it("gives missiles enough hit area for practical mobile aiming", () => {
     const sim = new Simulation();
     startPlaying(sim);
     const target = entity("barge", { x: WORLD_WIDTH / 2 + 55, y: 500 });
-    const shot: ShotState = { id: "shot-test", x: WORLD_WIDTH / 2, y: target.y, vx: 0, alive: true };
+    const shot: ShotState = { id: "shot-test", kind: "missile", x: WORLD_WIDTH / 2, y: target.y, vx: 0, alive: true };
 
     setPrivate(sim, "entities", new Map([[target.id, target]]));
     setPrivate(sim, "shots", [shot]);
@@ -123,11 +125,11 @@ describe("Simulation", () => {
     expect(snap.soundCues).toEqual(["hit"]);
   });
 
-  it.each(Object.keys(ENTITY_RULES) as EntityKind[])("lets shots destroy shootable %s entities for their rule score", (kind) => {
+  it.each(Object.keys(ENTITY_RULES) as EntityKind[])("lets one missile destroy shootable %s entities for their rule score", (kind) => {
     const sim = new Simulation();
     startPlaying(sim);
     const target = entity(kind, { y: 620 });
-    const shot: ShotState = { id: "shot-test", x: target.x, y: target.y, vx: 0, alive: true };
+    const shot: ShotState = { id: "shot-test", kind: "missile", x: target.x, y: target.y, vx: 0, alive: true };
 
     setPrivate(sim, "entities", new Map([[target.id, target]]));
     setPrivate(sim, "shots", [shot]);
@@ -145,7 +147,7 @@ describe("Simulation", () => {
     startPlaying(sim);
     const bridge = entitiesForRange(2000, 2300).find((candidate) => candidate.kind === "gate");
     expect(bridge).toBeDefined();
-    const shot: ShotState = { id: "shot-test", x: bridge!.x, y: bridge!.y, vx: 0, alive: true };
+    const shot: ShotState = { id: "shot-test", kind: "missile", x: bridge!.x, y: bridge!.y, vx: 0, alive: true };
 
     setPrivate(sim, "entities", new Map([[bridge!.id, bridge!]]));
     setPrivate(sim, "shots", [shot]);
@@ -160,16 +162,19 @@ describe("Simulation", () => {
   it("clears level-up messages after a short delay", () => {
     const sim = new Simulation();
     startPlaying(sim);
+    disableGeneratedEntities(sim);
     const bridge = entitiesForRange(2000, 2300).find((candidate) => candidate.kind === "gate");
     expect(bridge).toBeDefined();
-    const shot: ShotState = { id: "shot-test", x: bridge!.x, y: bridge!.y, vx: 0, alive: true };
+    const shot: ShotState = { id: "shot-test", kind: "missile", x: bridge!.x, y: bridge!.y, vx: 0, alive: true };
 
     setPrivate(sim, "entities", new Map([[bridge!.id, bridge!]]));
     setPrivate(sim, "shots", [shot]);
 
     expect(sim.update(0).message).toBe("LEVEL 2");
-    expect(sim.update(900).message).toBe("LEVEL 2");
-    expect(sim.update(900).message).toBe("");
+    for (let i = 0; i < 18; i++) sim.update(50);
+    expect(sim.snapshot().message).toBe("LEVEL 2");
+    for (let i = 0; i < 18; i++) sim.update(50);
+    expect(sim.snapshot().message).toBe("");
   });
 
   it("restarts after the last destroyed bridge when a life remains", () => {
@@ -177,7 +182,7 @@ describe("Simulation", () => {
     startPlaying(sim);
     const bridge = entitiesForRange(2000, 2300).find((candidate) => candidate.kind === "gate");
     expect(bridge).toBeDefined();
-    const shot: ShotState = { id: "shot-test", x: bridge!.x, y: bridge!.y, vx: 0, alive: true };
+    const shot: ShotState = { id: "shot-test", kind: "missile", x: bridge!.x, y: bridge!.y, vx: 0, alive: true };
 
     setPrivate(sim, "entities", new Map([[bridge!.id, bridge!]]));
     setPrivate(sim, "shots", [shot]);
@@ -201,7 +206,7 @@ describe("Simulation", () => {
     expect(target).toBeDefined();
     const playerY = target!.y - 200;
     const playerBounds = riverBoundsAt(playerY);
-    const shot: ShotState = { id: "shot-test", x: target!.x, y: target!.y, vx: 0, alive: true };
+    const shot: ShotState = { id: "shot-test", kind: "missile", x: target!.x, y: target!.y, vx: 0, alive: true };
 
     startPlaying(sim);
     setPrivate(sim, "player", {
@@ -231,6 +236,8 @@ describe("Simulation", () => {
     const charger: EntityState = {
       id: "charger-test",
       kind: "charger",
+      health: ENTITY_RULES.charger.maxHealth,
+      hitFlashMs: 0,
       x: player.x,
       y: player.y,
       w: CHARGER_WIDTH,
@@ -289,7 +296,8 @@ describe("Simulation", () => {
 
     expect(sim.update(50).soundCues).toEqual(["recharge"]);
     expect(sim.update(50).soundCues).toEqual([]);
-    expect(sim.update(320).soundCues).toEqual(["recharge"]);
+    for (let i = 0; i < 5; i++) sim.update(50);
+    expect(sim.update(50).soundCues).toEqual(["recharge"]);
   });
 
   it("reports bridge collision message and sound when the player hits a gate", () => {
@@ -335,6 +343,8 @@ describe("Simulation", () => {
     const obstacle: EntityState = {
       id: "barge-test",
       kind: "barge",
+      health: ENTITY_RULES.barge.maxHealth,
+      hitFlashMs: 0,
       x: player.x,
       y: player.y,
       w: 54,
@@ -366,6 +376,86 @@ describe("Simulation", () => {
     expect(sim.snapshot().state).toBe("playing");
     expect(sim.snapshot().player.lives).toBe(3);
     expect(sim.snapshot().level).toBe(1);
+  });
+
+  it("freezes movement, charge and timers while paused and clears held input on resume", () => {
+    const sim = new Simulation();
+    sim.setInput({ fire: true, right: true });
+    sim.update(16);
+    sim.pause();
+    const paused = sim.snapshot();
+    sim.setInput({ left: true, fire: true });
+    expect(sim.update(5000)).toEqual(paused);
+    sim.startOrResume();
+    const resumed = sim.update(16);
+    expect(resumed.state).toBe("playing");
+    expect(resumed.player.x).toBe(paused.player.x);
+    expect(resumed.player.charge).toBeLessThan(paused.player.charge);
+    expect(resumed.soundCues).not.toContain("fire");
+  });
+
+  it("requires a fresh fire press after crashing while fire is held", () => {
+    const sim = new Simulation();
+    sim.setInput({ fire: true });
+    setPrivate(sim, "player", { ...sim.snapshot().player, charge: 0 });
+    expect(sim.update(16).state).toBe("crashed");
+    sim.setInput({ fire: true });
+    expect(sim.update(16).state).toBe("crashed");
+    sim.setInput({ fire: false });
+    sim.setInput({ fire: true });
+    expect(sim.snapshot().state).toBe("playing");
+  });
+
+  it("discards the old checkpoint on a full restart and centers retries inside the river", () => {
+    const sim = new Simulation();
+    setPrivate(sim, "checkpointY", SECTION_LENGTH * 6 + 80);
+    setPrivate(sim, "state", "crashed");
+    sim.startOrResume();
+    const bounds = riverBoundsAt(sim.snapshot().player.y);
+    expect(sim.snapshot().player.x).toBe((bounds.left + bounds.right) / 2);
+    setPrivate(sim, "state", "game-over");
+    sim.startOrResume();
+    setPrivate(sim, "state", "crashed");
+    sim.startOrResume();
+    expect(sim.snapshot().player.y).toBe(80);
+  });
+
+  it("stops within ten world units after releasing keyboard steering", () => {
+    const sim = new Simulation();
+    startPlaying(sim, { right: true });
+    for (let i = 0; i < 10; i++) sim.update(16);
+    const releasedAt = sim.snapshot().player.x;
+    sim.setInput({ right: false });
+    for (let i = 0; i < 20; i++) sim.update(16);
+    expect(sim.snapshot().player.x - releasedAt).toBeLessThan(10);
+    expect(Math.abs(sim.snapshot().player.vx)).toBeLessThan(1);
+  });
+
+  it("gives keyboard steering priority over a stationary touch target", () => {
+    const sim = new Simulation();
+    startPlaying(sim, { right: true, steerTargetX: 100 });
+    expect(sim.update(16).player.x).toBeGreaterThan(WORLD_WIDTH / 2);
+  });
+
+  it("uses the same bounded elapsed time for protection and movement after a long frame", () => {
+    const sim = new Simulation();
+    startPlaying(sim);
+    const before = sim.snapshot().player;
+    const after = sim.update(5000).player;
+    expect(before.invulnerableMs - after.invulnerableMs).toBe(50);
+    expect(after.y - before.y).toBeCloseTo(before.speed * 0.05);
+  });
+
+  it("keeps charge drain and steering comparable at 30, 60 and 120 fps", () => {
+    const results = [30, 60, 120].map((fps) => {
+      const sim = new Simulation();
+      startPlaying(sim, { steerTargetX: 280 });
+      disableGeneratedEntities(sim);
+      for (let i = 0; i < fps; i++) sim.update(1000 / fps);
+      return sim.snapshot().player;
+    });
+    expect(Math.max(...results.map((p) => p.x)) - Math.min(...results.map((p) => p.x))).toBeLessThan(1);
+    for (const player of results) expect(player.charge).toBeCloseTo(94.3, 5);
   });
 });
 

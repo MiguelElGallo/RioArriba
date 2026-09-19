@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Electric River Raid</title>
+    <title>Río Arriba · Electric River Raid</title>
   </head>
   <body>
     <div id="app">
@@ -12,7 +12,7 @@
         Open this game at <strong>http://localhost:5173/</strong>. It will not run from a file URL.
       </div>
       <div id="game"></div>
-      <div id="hud" aria-live="polite">
+      <div id="hud">
         <div class="hud-row">
           <span id="score">000000</span>
           <span id="section">LEVEL 1</span>
@@ -21,28 +21,54 @@
         <div class="charge-wrap" aria-label="charge">
           <div id="charge"></div>
         </div>
+        <div class="flight-telemetry"><span id="charge-label">CHARGE 100%</span><span id="missile-hud">MISSILE · READY</span><span id="speed-label">CRUISE</span></div>
       </div>
-      <button id="info-toggle" type="button" aria-controls="info-panel" aria-expanded="false">i</button>
-      <section id="info-panel" aria-labelledby="info-title" hidden>
+      <div id="session-controls">
+        <button id="pause-toggle" type="button" disabled>Pause</button>
+        <button id="info-toggle" type="button" aria-label="How to play" aria-controls="info-panel" aria-expanded="false">?</button>
+      </div>
+      <section id="info-panel" role="dialog" aria-modal="true" aria-labelledby="info-title" hidden>
         <div class="info-header">
           <h1 id="info-title">Icons & Points</h1>
           <button id="info-close" type="button" aria-label="close info">×</button>
         </div>
+        <p>Drag anywhere on the river to steer. Hold GUN with your other thumb. Drag up/down or hold FAST/SLOW to change speed.</p>
+        <p>Keyboard: arrows or WASD to fly, Space for the machine gun, X for missiles, P/Esc to pause, Enter to start or retry.</p>
+        <p>The machine gun fires fast rounds: drones and jets take 2 hits; barges and bridges take 3. Hit flashes, amber damage tint, and missing health marks show damage.</p>
+        <p>Missiles travel more slowly and destroy a target in one hit. Tap MISSILE when READY, or hold to launch every 1.5 seconds. The countdown shows reloading.</p>
+        <p>Release both weapons and slow down over a charger to refill. Chargers break in one hit. Destroy bridges to reach the next level.</p>
         <div id="info-list"></div>
       </section>
-      <div id="fire-zone-hint" aria-hidden="true">●</div>
       <div id="status" hidden></div>
-      <section id="game-over-panel" aria-live="polite" hidden>
-        <p>Grid Offline</p>
-        <strong id="final-score">000000</strong>
-        <span>Tap to restart</span>
+      <section id="flight-panel" aria-labelledby="flight-title">
+        <div class="flight-card">
+          <p class="eyebrow">ELECTRIC RIVER RAID</p>
+          <h1 id="flight-title">Río Arriba</h1>
+          <p id="flight-description">Follow the river. Break bridges. Keep your charge.</p>
+          <div id="game-over-panel" hidden><span>Final score</span><strong id="final-score">000000</strong></div>
+          <div class="control-guide">
+            <p><strong>STEER</strong> Drag on the river · arrows / WASD</p>
+            <p><strong>GUN</strong> Hold GUN / Space · 2–3 hits</p>
+            <p><strong>MISSILE</strong> MISSILE / X · 1 hit, 1.5s reload</p>
+            <p><strong>RECHARGE</strong> Release fire + fly slowly over chargers</p>
+          </div>
+          <button id="flight-action" type="button">Start flight</button>
+          <p class="keyboard-hint">Enter to start / retry · P or Esc to pause</p>
+        </div>
       </section>
       <div id="touch-controls" aria-label="touch controls">
-        <button id="slow" type="button" aria-label="slow">-</button>
-        <button id="left" type="button" aria-label="bank left">‹</button>
-        <button id="fire" type="button" aria-label="fire">●</button>
-        <button id="right" type="button" aria-label="bank right">›</button>
-        <button id="fast" type="button" aria-label="accelerate">+</button>
+        <div class="speed-controls">
+          <button id="slow" type="button" aria-label="Hold to slow down">SLOW</button>
+          <button id="fast" type="button" aria-label="Hold to accelerate">FAST</button>
+        </div>
+        <span id="steer-hint">DRAG TO STEER</span>
+        <div class="weapon-controls">
+          <button id="missile" type="button" aria-label="Hold to launch missiles" aria-describedby="missile-status">
+            <span class="missile-icon" aria-hidden="true">↑</span>
+            <span>MISSILE</span><span id="missile-status">READY</span>
+          </button>
+          <button id="fire" type="button" aria-label="Hold to fire machine gun">GUN</button>
+        </div>
       </div>
     </div>
     <script>

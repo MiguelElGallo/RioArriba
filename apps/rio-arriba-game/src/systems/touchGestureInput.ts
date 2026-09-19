@@ -41,7 +41,7 @@ interface DragPointer {
   startX: number;
   startY: number;
   startPlayerX: number;
-  startTimeMs: number;
+  hasSteered: boolean;
   x: number;
   y: number;
 }
@@ -60,6 +60,7 @@ export function mergeInputStates(...states: Array<Partial<InputState> | undefine
       up: merged.up || state?.up === true,
       down: merged.down || state?.down === true,
       fire: merged.fire || state?.fire === true,
+      ...((merged.missile !== undefined || state?.missile !== undefined) && { missile: merged.missile === true || state?.missile === true }),
       steerTargetX: state?.steerTargetX ?? merged.steerTargetX
     }),
     { ...EMPTY_INPUT_STATE }
@@ -97,7 +98,7 @@ export class GestureInputController {
         startX: pointer.x,
         startY: pointer.y,
         startPlayerX: pointer.playerX ?? pointer.x,
-        startTimeMs: pointer.timeMs,
+        hasSteered: false,
         x: pointer.x,
         y: pointer.y
       };
@@ -111,6 +112,7 @@ export class GestureInputController {
     if (this.dragPointer?.pointerId === pointer.pointerId) {
       this.dragPointer = {
         ...this.dragPointer,
+        hasSteered: this.dragPointer.hasSteered || Math.abs(pointer.x - this.dragPointer.startX) >= this.dragDeadZonePx,
         x: pointer.x,
         y: pointer.y
       };
@@ -129,7 +131,7 @@ export class GestureInputController {
   }
 
   pointerCancel(pointer: GesturePointer): InputState {
-    this.firePointerIds.delete(pointer.pointerId);
+    if (this.firePointerIds.delete(pointer.pointerId)) this.firePulseUntilMs = 0;
     if (this.dragPointer?.pointerId === pointer.pointerId) {
       this.dragPointer = null;
     }
@@ -186,7 +188,7 @@ export class GestureInputController {
     const dx = this.dragPointer.x - this.dragPointer.startX;
     const dy = this.dragPointer.y - this.dragPointer.startY;
     const steerTargetX =
-      Math.abs(dx) >= this.dragDeadZonePx ? this.dragPointer.startPlayerX + dx * this.steerScale : undefined;
+      this.dragPointer.hasSteered ? this.dragPointer.startPlayerX + dx * this.steerScale : undefined;
 
     const input: InputState = {
       left: false,

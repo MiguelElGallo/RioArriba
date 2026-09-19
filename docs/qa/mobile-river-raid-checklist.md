@@ -5,8 +5,8 @@ Use this as the first QA gate for the mobile-first electric-plane browser game. 
 ## Critical Smoke
 
 - Game boots to a playable first screen without requiring desktop-only controls.
-- First touch, pointer, or keyboard input starts or resumes play predictably.
-- Main loop keeps updating after orientation changes, tab blur, and tab focus.
+- Start flight / Enter starts play; Resume flight / P / Esc explicitly resumes.
+- Orientation changes and tab blur pause play; focus alone never resumes it.
 - Pause, crash, out-of-energy, restart, and game-over states are reachable and recoverable.
 - No console errors during boot, gameplay, pause, restart, or resize.
 
@@ -48,17 +48,29 @@ Checks:
 ## Electric-Plane Rules
 
 - Energy drain is tied to time or distance consistently, not frame rate.
-- Recharge pickups increase energy once per pickup and cannot double-trigger after collection.
+- Chargers refill over time while overlapping; slow flight restores more charge, capped at 100%.
 - Boost, firing, or special abilities consume energy according to visible rules.
 - Empty-energy behavior is clear and does not create an unrecoverable soft lock.
 - Collision with terrain, enemies, bridges, and pickups matches visible sprites or shapes.
 
+## Weapons and Damage
+
+- Hold GUN / Space for fast gold rounds. Drones and jets take 2 hits; barges and bridges take 3.
+- MISSILE / X launches a distinct slower projectile, destroying a target in one hit.
+- Missile reload lasts 1.5 seconds of active play. Gunfire continues during reload.
+- The missile button and HUD show the countdown and READY; quick taps launch reliably.
+- A tap during reload does not queue a later launch. Holding launches again when ready.
+- Surviving enemies flash on impact and retain an amber tint and depleted health marks.
+- Score and bridge checkpoints change only on destruction, once per target.
+- Pause freezes reload; resume clears held weapons; retry restores a ready missile.
+- Touch cancellation clears both weapons without a stuck firing state.
+
 ## Responsive Automation Targets
 
-Add automated checks once the app structure exists:
+Run `npm test`, `npm run build`, and `npm run test:e2e` from the game folder:
 
 - Build command completes without warnings promoted to errors.
-- Unit tests cover frame-rate independent energy drain and pickup collection.
+- Unit tests cover frame-rate independent energy drain and sustained recharging.
 - Simulation tests cover collision boundaries for river edge, obstacle, bridge, and recharge pickup.
 - Playwright smoke test boots the app, verifies a nonblank canvas, starts gameplay, pauses, restarts, and captures screenshots at the mobile viewports above.
 - Screenshot check confirms HUD and touch controls stay inside the viewport and outside the central forward path.

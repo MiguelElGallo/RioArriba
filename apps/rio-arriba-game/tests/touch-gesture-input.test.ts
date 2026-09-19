@@ -2,6 +2,18 @@ import { describe, expect, it } from "vitest";
 import { EMPTY_INPUT_STATE, GestureInputController, mergeInputStates } from "../src/systems/touchGestureInput";
 
 describe("GestureInputController", () => {
+  it("returns to the original target when a drag moves back inside the dead zone", () => {
+    const input = new GestureInputController({ steerScale: 1 });
+    input.pointerDown({ pointerId: 1, x: 100, y: 100, timeMs: 0, playerX: 240 });
+    input.pointerMove({ pointerId: 1, x: 140, y: 100, timeMs: 16 });
+    expect(input.pointerMove({ pointerId: 1, x: 100, y: 100, timeMs: 32 }).steerTargetX).toBe(240);
+  });
+
+  it("cancels a pending fire pulse when a touch is interrupted", () => {
+    const input = new GestureInputController();
+    input.pointerDown({ pointerId: 1, x: 0, y: 0, timeMs: 0, isFireZone: true });
+    expect(input.pointerCancel({ pointerId: 1, x: 0, y: 0, timeMs: 5 }).fire).toBe(false);
+  });
   it("keeps the first pointer idle until it crosses the drag threshold", () => {
     const input = new GestureInputController({ dragThresholdPx: 20 });
 
@@ -200,6 +212,10 @@ describe("GestureInputController", () => {
 });
 
 describe("mergeInputStates", () => {
+  it("merges missile input independently of machine-gun and steering input", () => {
+    expect(mergeInputStates({ fire: true, left: true }, { missile: true }, { missile: false })).toMatchObject({ fire: true, left: true, missile: true });
+    expect(mergeInputStates({ missile: false }, { fire: true }).missile).toBe(false);
+  });
   it("combines keyboard, touch button, and gesture states without mutating inputs", () => {
     const keyboard = { left: true, right: false, up: false, down: false, fire: false };
     const gesture = { left: false, right: true, up: true, down: false, fire: false, steerTargetX: 260 };

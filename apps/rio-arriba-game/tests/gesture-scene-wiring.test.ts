@@ -7,7 +7,7 @@ describe("gesture scene wiring", () => {
   it("keeps MainScene wired to the tested gesture input adapter", () => {
     expect(sceneSource).toContain("GestureInputController");
     expect(sceneSource).toContain("dragDeadZonePx");
-    expect(sceneSource).toContain("isFireZone");
+    expect(sceneSource).toContain('"lostpointercapture"');
     expect(sceneSource).toContain("this.input.addPointer(2)");
     expect(sceneSource).toContain("mergeInputStates");
     expect(sceneSource).toContain("bindGestureControls()");

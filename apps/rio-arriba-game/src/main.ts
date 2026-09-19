@@ -4,7 +4,13 @@ import { ENTITY_RULES } from "./systems/types";
 import type { EntityKind } from "./systems/types";
 import "./styles/global.css";
 
-new Phaser.Game({
+function viewportSize(): { width: number; height: number } {
+  // Keep the entire river and at least 540 world units of forward view visible.
+  const zoom = Math.min(1, window.innerWidth / 480, window.innerHeight / 540);
+  return { width: window.innerWidth / zoom, height: window.innerHeight / zoom };
+}
+
+export const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: "game",
   width: 480,
@@ -12,14 +18,19 @@ new Phaser.Game({
   backgroundColor: "#071718",
   scene: [MainScene],
   scale: {
-    mode: Phaser.Scale.RESIZE,
-    width: window.innerWidth,
-    height: window.innerHeight
+    mode: Phaser.Scale.FIT,
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+    ...viewportSize()
   },
   render: {
     pixelArt: false,
     antialias: true
   }
+});
+
+window.addEventListener("resize", () => {
+  const { width, height } = viewportSize();
+  game.scale.setGameSize(width, height);
 });
 
 const infoOrder: EntityKind[] = ["charger", "barge", "drone", "jet", "gate"];
@@ -56,7 +67,28 @@ function setInfoVisible(visible: boolean): void {
   if (!infoToggle || !infoPanel) return;
   infoPanel.hidden = !visible;
   infoToggle.setAttribute("aria-expanded", String(visible));
+  for (const id of ["session-controls", "flight-panel", "touch-controls"]) {
+    const element = document.getElementById(id);
+    if (element) element.inert = visible;
+  }
+  if (visible) {
+    window.dispatchEvent(new Event("flight-help"));
+    infoClose?.focus();
+  } else {
+    infoToggle.focus();
+  }
 }
 
 infoToggle?.addEventListener("click", () => setInfoVisible(infoPanel?.hidden ?? true));
 infoClose?.addEventListener("click", () => setInfoVisible(false));
+document.addEventListener("keydown", (event) => {
+  if (infoPanel?.hidden === false && event.key === "Escape") {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    setInfoVisible(false);
+  }
+  if (infoPanel?.hidden === false && event.key === "Tab") {
+    event.preventDefault();
+    infoClose?.focus();
+  }
+});

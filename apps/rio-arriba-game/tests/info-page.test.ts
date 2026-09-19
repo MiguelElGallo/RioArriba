@@ -46,7 +46,7 @@ describe("info page", () => {
   it("includes a final game-over score screen", () => {
     expect(html).toContain('id="game-over-panel"');
     expect(html).toContain('id="final-score"');
-    expect(html).toContain("Tap to restart");
+    expect(html).toContain('id="flight-action"');
   });
 
   it("keeps local and GitHub Pages publish assumptions explicit", () => {

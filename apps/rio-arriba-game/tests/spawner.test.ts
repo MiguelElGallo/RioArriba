@@ -1,148 +1,102 @@
 import { describe, expect, it } from "vitest";
-import { riverBoundsAt, SECTION_LENGTH } from "../src/systems/river";
-import {
-  chargerChanceForSection,
-  CHARGER_HEIGHT,
-  CHARGER_WIDTH,
-  chargerRowStrideForSection,
-  entitiesForRange,
-  FIRST_SECTION_CHARGER_CHANCE,
-  MIN_CHARGER_CHANCE,
-  MIN_CHARGER_ROW_GAP,
-  secondaryThreatChanceForSection,
-  SPAWN_ROW_SPACING,
-  threatWeightsForSection
-} from "../src/systems/spawner";
+import { difficultyForSection } from "../src/systems/difficulty";
+import { bridgeYForSection, riverBoundsAt, SECTION_LENGTH } from "../src/systems/river";
+import { CHARGER_HEIGHT, CHARGER_WIDTH, entitiesForRange } from "../src/systems/spawner";
 
-describe("spawner charger pacing", () => {
-  it("makes early chargers more available while keeping later sections scarcer", () => {
-    expect(chargerChanceForSection(0)).toBe(FIRST_SECTION_CHARGER_CHANCE);
-    expect(chargerChanceForSection(0)).toBeGreaterThan(0.58);
-    expect(chargerChanceForSection(2)).toBeLessThan(chargerChanceForSection(0));
-    expect(chargerChanceForSection(8)).toBeLessThan(chargerChanceForSection(2));
-    expect(chargerChanceForSection(18)).toBe(MIN_CHARGER_CHANCE);
-  });
+function level(section: number) {
+  return entitiesForRange(section * SECTION_LENGTH, (section + 1) * SECTION_LENGTH - 1);
+}
 
-  it("spaces charger-eligible rows farther apart as sections progress", () => {
-    expect(chargerRowStrideForSection(0)).toBe(MIN_CHARGER_ROW_GAP);
-    expect(chargerRowStrideForSection(2)).toBe(chargerRowStrideForSection(0));
-    expect(chargerRowStrideForSection(3)).toBeGreaterThan(chargerRowStrideForSection(0));
-    expect(chargerRowStrideForSection(4)).toBeGreaterThan(chargerRowStrideForSection(2));
-    expect(chargerRowStrideForSection(8)).toBeGreaterThan(chargerRowStrideForSection(4));
-  });
-
-  it("generates more chargers in early level bands than late level bands", () => {
-    const early = chargerCountForLevels(1, 3);
-    const middle = chargerCountForLevels(4, 6);
-    const late = chargerCountForLevels(7, 9);
-
-    expect(early).toBeGreaterThan(0);
-    expect(early).toBeGreaterThan(middle);
-    expect(middle).toBeGreaterThan(late);
-  });
-
-  it("keeps more chargers overall while making later chargers farther apart", () => {
-    const earlyChargers = chargerPositionsForLevels(1, 6);
-    const lateChargers = chargerPositionsForLevels(7, 12);
-
-    expect(earlyChargers.length).toBeGreaterThanOrEqual(10);
-    expect(lateChargers.length).toBeGreaterThan(0);
-    expect(averageGap(lateChargers)).toBeGreaterThan(averageGap(earlyChargers));
-  });
-
-  it("prevents charging stations from spawning in adjacent rows", () => {
-    const chargers = chargerPositionsForLevels(1, 12);
-    expect(minGap(chargers)).toBeGreaterThanOrEqual(SPAWN_ROW_SPACING * MIN_CHARGER_ROW_GAP);
-  });
-
-  it("makes chargers long enough to support sustained slow recharging", () => {
-    const charger = entitiesForRange(0, SECTION_LENGTH).find((entity) => entity.kind === "charger");
-
-    expect(charger).toBeDefined();
-    expect(charger!.w).toBe(CHARGER_WIDTH);
-    expect(charger!.h).toBe(CHARGER_HEIGHT);
-    expect(charger!.h).toBeGreaterThanOrEqual(150);
-  });
-});
-
-describe("spawner threat pacing", () => {
-  it("shifts later sections toward more drones and jets", () => {
-    const low = threatWeightsForSection(0);
-    const high = threatWeightsForSection(8);
-
-    expect(high.barge).toBeLessThan(low.barge);
-    expect(high.drone + high.jet).toBeGreaterThan(low.drone + low.jet);
-    expect(high.jet).toBeGreaterThan(low.jet);
-  });
-
-  it("generates more drones and jets in high level bands than low level bands", () => {
-    const low = threatCountsForLevels(1, 3);
-    const high = threatCountsForLevels(7, 9);
-
-    expect(high.drone).toBeGreaterThan(low.drone);
-    expect(high.jet).toBeGreaterThan(low.jet);
-  });
-
-  it("increases secondary enemy pressure in later sections", () => {
-    expect(secondaryThreatChanceForSection(0)).toBeLessThan(secondaryThreatChanceForSection(6));
-    expect(threatCountForLevels(1, 3)).toBeGreaterThan(18);
-  });
-});
-
-describe("spawner bridges", () => {
-  it("places one visible bridge gate near the end of every section", () => {
-    for (let section = 0; section < 8; section += 1) {
-      const fromY = section * SECTION_LENGTH;
-      const toY = (section + 1) * SECTION_LENGTH - 1;
-      const gates = entitiesForRange(fromY, toY).filter((entity) => entity.kind === "gate" && entity.y >= fromY && entity.y <= toY);
-
-      expect(gates).toHaveLength(1);
-      expect(gates[0].y).toBeGreaterThan(toY - SECTION_LENGTH * 0.16);
-      const room = riverBoundsAt(gates[0].y).width;
-      expect(gates[0].h).toBeGreaterThanOrEqual(46);
-      expect(gates[0].w).toBeLessThanOrEqual(room - 24);
-      expect(gates[0].w).toBeGreaterThanOrEqual(110);
-      if (section === 0) expect(gates[0].w).toBeLessThan(230);
+describe("deliberate difficulty progression", () => {
+  it("opens with a clear runway, single barges, and two easy-to-reach chargers", () => {
+    const opening = level(0);
+    const enemies = opening.filter((entity) => !["charger", "gate"].includes(entity.kind));
+    expect(enemies.length).toBeGreaterThanOrEqual(2);
+    expect(enemies.every((entity) => entity.kind === "barge" && entity.vx === 0)).toBe(true);
+    expect(enemies.every((entity) => entity.y >= 480)).toBe(true);
+    const chargers = opening.filter((entity) => entity.kind === "charger");
+    expect(chargers).toHaveLength(2);
+    for (const charger of chargers) {
+      const bounds = riverBoundsAt(charger.y);
+      expect(charger.x).toBeCloseTo((bounds.left + bounds.right) / 2);
     }
   });
+
+  it("introduces drones before jets and keeps paired threats out of the first two levels", () => {
+    expect(level(1).some((entity) => entity.kind === "drone")).toBe(true);
+    for (let section = 0; section < 3; section++) expect(level(section).some((entity) => entity.kind === "jet")).toBe(false);
+    expect([3, 4, 5].flatMap(level).some((entity) => entity.kind === "jet")).toBe(true);
+    for (const section of [0, 1]) expect(level(section).some((entity) => entity.id.startsWith("threat-") && entity.id.endsWith("-1"))).toBe(false);
+  });
+
+  it("increases encounter pressure and crossing speed gradually, with a finite ceiling", () => {
+    const threats = (sections: number[]) => sections.flatMap(level).filter((entity) => !["charger", "gate"].includes(entity.kind));
+    const early = threats([0, 1, 2]);
+    const late = threats([7, 8, 9]);
+    expect(late.length).toBeGreaterThan(early.length);
+    expect(late.filter((entity) => entity.vx !== 0).length).toBeGreaterThan(early.filter((entity) => entity.vx !== 0).length);
+    expect(difficultyForSection(1000)).toEqual(difficultyForSection(9));
+    expect(difficultyForSection(9).crossingSpeed).toBeLessThanOrEqual(64);
+  });
 });
 
-function chargerCountForLevels(firstLevel: number, lastLevel: number): number {
-  return chargerPositionsForLevels(firstLevel, lastLevel).length;
-}
+describe("fair and deterministic encounters", () => {
+  it("guarantees recharge opportunities even in very late levels", () => {
+    for (let section = 0; section < 50; section++) {
+      const chargers = level(section).filter((entity) => entity.kind === "charger");
+      expect(chargers.length).toBe(section < 3 ? 2 : 1);
+      for (const charger of chargers) {
+        expect(charger.w).toBe(CHARGER_WIDTH);
+        expect(charger.h).toBe(CHARGER_HEIGHT);
+      }
+    }
+    const stations = entitiesForRange(0, SECTION_LENGTH * 20).filter((entity) => entity.kind === "charger");
+    for (let i = 1; i < stations.length; i++) {
+      const gap = stations[i].y - stations[i - 1].y;
+      expect(gap).toBeGreaterThanOrEqual(700);
+      expect(gap / 165 * 5.7).toBeLessThan(80);
+    }
+  });
 
-function chargerPositionsForLevels(firstLevel: number, lastLevel: number): number[] {
-  const fromY = (firstLevel - 1) * SECTION_LENGTH;
-  const toY = lastLevel * SECTION_LENGTH - 1;
-  return entitiesForRange(fromY, toY)
-    .filter((entity) => entity.kind === "charger")
-    .map((entity) => entity.y);
-}
+  it("gives chargers and bridge approaches space free of overlapping enemies", () => {
+    for (let section = 0; section < 30; section++) {
+      const entities = level(section);
+      const enemies = entities.filter((entity) => !["charger", "gate"].includes(entity.kind));
+      const stations = entities.filter((entity) => entity.kind === "charger");
+      for (const enemy of enemies) {
+        expect(bridgeYForSection(section) - enemy.y).toBeGreaterThan(200);
+        for (const charger of stations) expect(Math.abs(enemy.y - charger.y)).toBeGreaterThanOrEqual(180);
+      }
+    }
+  });
 
-function threatCountsForLevels(firstLevel: number, lastLevel: number): { drone: number; jet: number } {
-  const fromY = (firstLevel - 1) * SECTION_LENGTH;
-  const toY = lastLevel * SECTION_LENGTH - 1;
-  const entities = entitiesForRange(fromY, toY);
+  it("aligns exactly one bridge with each river funnel and spans the opening", () => {
+    for (let section = 0; section < 50; section++) {
+      const gates = level(section).filter((entity) => entity.kind === "gate");
+      expect(gates).toHaveLength(1);
+      const gate = gates[0];
+      const bounds = riverBoundsAt(gate.y);
+      expect(gate.y).toBe(bridgeYForSection(section));
+      expect(gate.w).toBeCloseTo(bounds.width - 24);
+      expect(gate.x).toBeCloseTo((bounds.left + bounds.right) / 2);
+    }
+  });
 
-  return {
-    drone: entities.filter((entity) => entity.kind === "drone").length,
-    jet: entities.filter((entity) => entity.kind === "jet").length
-  };
-}
+  it("spawns entities inside the river including the whole length of a charger", () => {
+    for (const entity of entitiesForRange(0, SECTION_LENGTH * 30)) {
+      for (const y of [entity.y - entity.h / 2, entity.y, entity.y + entity.h / 2]) {
+        const bounds = riverBoundsAt(y);
+        expect(entity.x - entity.w / 2).toBeGreaterThanOrEqual(bounds.left);
+        expect(entity.x + entity.w / 2).toBeLessThanOrEqual(bounds.right);
+      }
+    }
+  });
 
-function averageGap(positions: number[]): number {
-  const sorted = [...positions].sort((a, b) => a - b);
-  const gaps = sorted.slice(1).map((position, index) => position - sorted[index]);
-  return gaps.reduce((sum, gap) => sum + gap, 0) / gaps.length;
-}
-
-function minGap(positions: number[]): number {
-  const sorted = [...positions].sort((a, b) => a - b);
-  return Math.min(...sorted.slice(1).map((position, index) => position - sorted[index]));
-}
-
-function threatCountForLevels(firstLevel: number, lastLevel: number): number {
-  const fromY = (firstLevel - 1) * SECTION_LENGTH;
-  const toY = lastLevel * SECTION_LENGTH - 1;
-  return entitiesForRange(fromY, toY).filter((entity) => !["charger", "gate"].includes(entity.kind)).length;
-}
+  it("produces identical entities whether a range is requested together or in pieces", () => {
+    const whole = entitiesForRange(0, SECTION_LENGTH * 3 - 1);
+    const pieces = [0, 1, 2].flatMap(level);
+    expect(whole).toEqual(pieces);
+    expect(new Set(whole.map((entity) => entity.id)).size).toBe(whole.length);
+    expect(entitiesForRange(700, 1700)).toEqual(whole.filter((entity) => entity.y >= 700 && entity.y <= 1700));
+  });
+});

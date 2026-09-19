@@ -8,6 +8,7 @@ export default defineConfig(({ command }) => ({
     port: 5173
   },
   test: {
-    environment: "node"
+    environment: "node",
+    include: ["tests/**/*.test.ts"]
   }
 }));

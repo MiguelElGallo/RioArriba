@@ -1,3 +1,5 @@
+import { difficultyForSection } from "./difficulty";
+
 export const WORLD_WIDTH = 480;
 export const SECTION_LENGTH = 2200;
 
@@ -7,26 +9,28 @@ export interface RiverBounds {
   width: number;
 }
 
+export function bridgeYForSection(section: number): number {
+  return (section + 1) * SECTION_LENGTH - 120;
+}
+
 export function riverBoundsAt(y: number): RiverBounds {
   const section = Math.floor(Math.max(0, y) / SECTION_LENGTH);
-  const phase = y * 0.006;
-  const baseCenter =
-    WORLD_WIDTH / 2 +
-    Math.sin(phase) * 55 +
-    Math.sin(y * 0.0021 + section * 1.7) * 44;
-  const difficulty = Math.min(240, section * 26);
-  const baseWidth =
-    394 -
-    difficulty +
-    Math.sin(y * 0.004 + 2.3) * 28 +
-    Math.sin(y * 0.011) * 14;
+  const current = difficultyForSection(section);
+  const next = difficultyForSection(section + 1);
+  const progress = Math.max(0, y / SECTION_LENGTH - section);
+  const blend = progress * progress * (3 - 2 * progress);
+  const bend = lerp(current.bendAmplitude, next.bendAmplitude, blend);
+  // Continuous phases avoid sudden sideways bank jumps at level boundaries.
+  const baseCenter = WORLD_WIDTH / 2 + Math.sin(y * 0.0025) * bend + Math.sin(y * 0.006) * bend * 0.4;
+  const baseWidth = lerp(current.riverWidth, next.riverWidth, blend) + Math.sin(y * 0.004) * 8;
   const bridgeFunnel = bridgeFunnelAt(y, section);
-  const bridgeWidth = Math.max(140, 166 - bridgeFunnel.section * 6);
+  const bridgeWidth = difficultyForSection(bridgeFunnel.section).bridgeWidth;
   const center = lerp(baseCenter, WORLD_WIDTH / 2, bridgeFunnel.strength * 0.58);
   const width = lerp(baseWidth, bridgeWidth, bridgeFunnel.strength);
-  const clampedWidth = Math.max(118, Math.min(430, width));
-  const left = Math.max(20, center - clampedWidth / 2);
-  const right = Math.min(WORLD_WIDTH - 20, center + clampedWidth / 2);
+  const clampedWidth = Math.max(140, Math.min(430, width));
+  const clampedCenter = Math.max(20 + clampedWidth / 2, Math.min(WORLD_WIDTH - 20 - clampedWidth / 2, center));
+  const left = clampedCenter - clampedWidth / 2;
+  const right = clampedCenter + clampedWidth / 2;
 
   return { left, right, width: right - left };
 }
@@ -34,11 +38,11 @@ export function riverBoundsAt(y: number): RiverBounds {
 function bridgeFunnelAt(y: number, section: number): { strength: number; section: number } {
   const upcoming = {
     section,
-    strength: bridgeFunnelStrength(y, (section + 1) * SECTION_LENGTH - 120)
+    strength: bridgeFunnelStrength(y, bridgeYForSection(section))
   };
   const previous = {
     section: Math.max(0, section - 1),
-    strength: section > 0 ? bridgeFunnelStrength(y, section * SECTION_LENGTH - 120) : 0
+    strength: section > 0 ? bridgeFunnelStrength(y, bridgeYForSection(section - 1)) : 0
   };
   return previous.strength > upcoming.strength ? previous : upcoming;
 }
